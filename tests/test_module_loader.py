@@ -69,7 +69,7 @@ class TestModuleLoader:
         
         # Patch importlib.import_module to return our mock module
         with patch('importlib.import_module', return_value=mock_module):
-            with pytest.raises(AttributeError, match="does not have a run method"):
+            with pytest.raises(AttributeError, match="does not have a run function"):
                 load_and_run('test_module')
 
     def test_load_and_run_with_function_error(self):
