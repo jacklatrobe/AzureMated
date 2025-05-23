@@ -43,6 +43,41 @@ python main.py powerbi -s <subscription_id> [-g <resource_group>]
 python main.py run <module_name> -s <subscription_id> [additional params]
 ```
 
+## Testing
+
+FabricFriend includes a comprehensive test suite built with pytest. The tests cover:
+
+- Module loader functionality
+- Common utilities
+- Main application flow
+- Module integration
+
+To set up the test environment:
+
+```powershell
+# Setup test environment
+.\setup_test_env.ps1
+```
+
+To run the tests:
+
+```powershell
+# Run all tests
+python run_tests.py
+
+# Or directly with pytest
+pytest
+
+# Run specific test file
+pytest tests\test_module_loader.py
+
+# Run with verbose output
+pytest -v
+
+# Run with code coverage
+pytest --cov=utils --cov=main --cov-report=term-missing
+```
+
 ## Documentation
 
 Comprehensive documentation is available in the [docs](docs/) directory:
