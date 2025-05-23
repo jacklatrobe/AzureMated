@@ -29,36 +29,47 @@ pip install -r requirements.txt
 
 FabricFriend provides several commands:
 
-### Authentication Check
-
-```
+```powershell
+# Check authentication
 python main.py auth
-```
 
-### List Microsoft Fabric Instances
-
-```
+# List Microsoft Fabric instances
 python main.py fabric -s <subscription_id> [-g <resource_group>]
-```
 
-### List Power BI Premium Instances
-
-```
+# List Power BI Premium instances
 python main.py powerbi -s <subscription_id> [-g <resource_group>]
-```
 
-### Run a Module
-
-```
+# Run a module
 python main.py run <module_name> -s <subscription_id> [additional params]
 ```
 
+## Documentation
+
+Comprehensive documentation is available in the [docs](docs/) directory:
+
+- [Getting Started](docs/getting-started.md)
+- [Architecture Overview](docs/architecture.md)
+- [Module System](docs/modules.md)
+- [Utilities](docs/utilities.md)
+- [Authentication](docs/authentication.md)
+- [Templates](docs/templates.md)
+
 ## Features
 
-- Integration with Azure Storage
-- Azure Key Vault secret management
-- Resource management capabilities
-- More features coming soon!
+- Authentication with Azure using ChainedTokenCredential
+- Microsoft Fabric instance management
+- Power BI Premium instance management
+- Azure resource topology visualization
+- Modular architecture for easy extension
+- Dynamic module loading system
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Contributing
 
