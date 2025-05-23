@@ -15,7 +15,7 @@ from typing import Optional, List
 
 # Import modules and utilities
 from modules import FabricManager, PowerBIManager
-from utils import initialize_credential, console, display_results, check_azure_auth, check_microsoft365_auth
+from utils import initialize_credential, console, display_results, check_azure_auth, check_microsoft365_auth, load_and_run
 
 # Configure logging
 logging.basicConfig(
@@ -87,6 +87,34 @@ def check_auth(args):
     else:
         console.print("[yellow]Microsoft 365 authentication check not yet implemented[/yellow]")
 
+def run_module(args):
+    """
+    Run a module using the module loader.
+    
+    Args:
+        args: Command line arguments
+    """
+    try:
+        # Prepare arguments for the module
+        module_args = vars(args).copy()
+        # Remove the module_name and func from the arguments
+        module_args.pop("module_name", None)
+        module_args.pop("func", None)
+        
+        # Load and run the module
+        result = load_and_run(f"modules.{args.module_name}", module_args)
+        
+        # Display the result
+        console.print(f"[bold green]Module {args.module_name} executed successfully[/bold green]")
+        
+        # TODO: Implement a more sophisticated result display
+        console.print(result)
+        
+    except Exception as e:
+        console.print(f"[bold red]Error running module {args.module_name}: {str(e)}[/bold red]")
+        log.exception(f"Error running module {args.module_name}")
+        sys.exit(1)
+
 def main():
     """
     Main entry point for the application.
@@ -113,6 +141,14 @@ def main():
     # Auth check command
     auth_parser = subparsers.add_parser("auth", help="Check authentication status")
     auth_parser.set_defaults(func=check_auth)
+      # Module run command
+    module_parser = subparsers.add_parser("run", help="Run a module")
+    module_parser.add_argument("module_name", help="Name of the module to run (fabric, powerbi, azure_topology)")
+    module_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
+    module_parser.add_argument("-g", "--resource-group", help="Resource group name")
+    module_parser.add_argument("-i", "--instance-id", help="Instance ID for specific operations")
+    module_parser.add_argument("-t", "--resource-type", help="Resource type for topology operations")
+    module_parser.set_defaults(func=run_module)
     
     # Parse arguments
     args = parser.parse_args()

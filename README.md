@@ -1,10 +1,10 @@
 # FabricFriend
 
-A Python project for interacting with Azure services.
+A console application for Microsoft Fabric and Power BI management using the Azure Python SDK.
 
 ## Description
 
-FabricFriend is a tool designed to simplify interactions with Azure services. This project provides a set of utilities and modules to help you work with Azure resources more efficiently.
+FabricFriend is a command-line tool that helps you manage and monitor Microsoft Fabric instances and Power BI Premium resources in your Azure environment. It provides commands for listing resources, checking authentication status, and running specialized modules.
 
 ## Installation
 
@@ -27,8 +27,30 @@ pip install -r requirements.txt
 
 ## Usage
 
-```python
-# Example usage code will go here
+FabricFriend provides several commands:
+
+### Authentication Check
+
+```
+python main.py auth
+```
+
+### List Microsoft Fabric Instances
+
+```
+python main.py fabric -s <subscription_id> [-g <resource_group>]
+```
+
+### List Power BI Premium Instances
+
+```
+python main.py powerbi -s <subscription_id> [-g <resource_group>]
+```
+
+### Run a Module
+
+```
+python main.py run <module_name> -s <subscription_id> [additional params]
 ```
 
 ## Features
