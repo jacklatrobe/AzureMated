@@ -97,58 +97,93 @@ def run_module(args):
     try:
         # Prepare arguments for the module
         module_args = vars(args).copy()
-        # Remove the module_name and func from the arguments
+        # Remove the module_name, command, and func from the arguments
         module_args.pop("module_name", None)
+        module_args.pop("command", None)
         module_args.pop("func", None)
         
-        # Load and run the module
-        result = load_and_run(f"modules.{args.module_name}", module_args)
+        # Load and run the module with the specified command
+        result = load_and_run(
+            f"modules.{args.module_name}", 
+            module_args, 
+            args.command if hasattr(args, "command") and args.command else None
+        )
         
         # Display the result
-        console.print(f"[bold green]Module {args.module_name} executed successfully[/bold green]")
+        if hasattr(args, "command") and args.command:
+            console.print(f"[bold green]Module {args.module_name} executed command '{args.command}' successfully[/bold green]")
+        else:
+            console.print(f"[bold green]Module {args.module_name} executed successfully[/bold green]")
         
         # TODO: Implement a more sophisticated result display
         console.print(result)
         
     except Exception as e:
-        console.print(f"[bold red]Error running module {args.module_name}: {str(e)}[/bold red]")
-        log.exception(f"Error running module {args.module_name}")
+        if hasattr(args, "command") and args.command:
+            console.print(f"[bold red]Error running module {args.module_name} command '{args.command}': {str(e)}[/bold red]")
+            log.exception(f"Error running module {args.module_name} command '{args.command}'")
+        else:
+            console.print(f"[bold red]Error running module {args.module_name}: {str(e)}[/bold red]")
+            log.exception(f"Error running module {args.module_name}")
         sys.exit(1)
 
 def main():
     """
     Main entry point for the application.
+    
+    Supports Docker-like CLI structure:
+    fabricfriend [module] [command] [arguments]
     """
     parser = argparse.ArgumentParser(
         description="FabricFriend - Microsoft Fabric and Power BI Management Tool"
     )
     
-    # Create subparsers for commands
-    subparsers = parser.add_subparsers(dest="command", help="Command to run")
+    # Create subparsers for modules
+    subparsers = parser.add_subparsers(dest="module_name", help="Module to run")
     
-    # Fabric instances command
-    fabric_parser = subparsers.add_parser("fabric", help="List Microsoft Fabric instances")
-    fabric_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
-    fabric_parser.add_argument("-g", "--resource-group", help="Resource group name")
-    fabric_parser.set_defaults(func=list_fabric_instances)
+    # Fabric module
+    fabric_parser = subparsers.add_parser("fabric", help="Microsoft Fabric operations")
+    fabric_subparsers = fabric_parser.add_subparsers(dest="command", help="Command to run")
     
-    # Power BI Premium command
-    powerbi_parser = subparsers.add_parser("powerbi", help="List Power BI Premium instances")
-    powerbi_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
-    powerbi_parser.add_argument("-g", "--resource-group", help="Resource group name")
-    powerbi_parser.set_defaults(func=list_powerbi_premium)
+    # Fabric list command
+    fabric_list_parser = fabric_subparsers.add_parser("list", help="List Microsoft Fabric instances")
+    fabric_list_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
+    fabric_list_parser.add_argument("-g", "--resource-group", help="Resource group name")
+    
+    # Fabric get command
+    fabric_get_parser = fabric_subparsers.add_parser("get", help="Get Microsoft Fabric instance details")
+    fabric_get_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
+    fabric_get_parser.add_argument("-i", "--instance-id", required=True, help="Instance ID")
+    
+    # Power BI module
+    powerbi_parser = subparsers.add_parser("powerbi", help="Power BI operations")
+    powerbi_subparsers = powerbi_parser.add_subparsers(dest="command", help="Command to run")
+    
+    # Power BI list command
+    powerbi_list_parser = powerbi_subparsers.add_parser("list", help="List Power BI Premium instances")
+    powerbi_list_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
+    powerbi_list_parser.add_argument("-g", "--resource-group", help="Resource group name")
+    
+    # Power BI scan-data command
+    powerbi_scan_parser = powerbi_subparsers.add_parser("scan-data", help="Scan Power BI data")
+    powerbi_scan_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
+    powerbi_scan_parser.add_argument("-i", "--instance-id", help="Instance ID")
+    
+    # Azure Topology module
+    topology_parser = subparsers.add_parser("topology", help="Azure resource topology operations")
+    topology_subparsers = topology_parser.add_subparsers(dest="command", help="Command to run")
+    
+    # Azure Topology visualize command
+    topology_visualize_parser = topology_subparsers.add_parser("visualize", help="Visualize Azure resource topology")
+    topology_visualize_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
+    topology_visualize_parser.add_argument("-t", "--resource-type", help="Resource type filter")
+    
+    # Authentication module
+    auth_parser = subparsers.add_parser("auth", help="Authentication operations")
+    auth_subparsers = auth_parser.add_subparsers(dest="command", help="Command to run")
     
     # Auth check command
-    auth_parser = subparsers.add_parser("auth", help="Check authentication status")
-    auth_parser.set_defaults(func=check_auth)
-      # Module run command
-    module_parser = subparsers.add_parser("run", help="Run a module")
-    module_parser.add_argument("module_name", help="Name of the module to run (fabric, powerbi, azure_topology)")
-    module_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
-    module_parser.add_argument("-g", "--resource-group", help="Resource group name")
-    module_parser.add_argument("-i", "--instance-id", help="Instance ID for specific operations")
-    module_parser.add_argument("-t", "--resource-type", help="Resource type for topology operations")
-    module_parser.set_defaults(func=run_module)
+    auth_check_parser = auth_subparsers.add_parser("check", help="Check authentication status")
     
     # Parse arguments
     args = parser.parse_args()
@@ -156,9 +191,9 @@ def main():
     # Display header
     console.print("[bold blue]FabricFriend[/bold blue] - Microsoft Fabric and Power BI Management Tool")
     
-    # Run the specified command
-    if hasattr(args, "func"):
-        args.func(args)
+    # Run the specified module and command
+    if hasattr(args, "module_name") and args.module_name:
+        run_module(args)
     else:
         parser.print_help()
 
