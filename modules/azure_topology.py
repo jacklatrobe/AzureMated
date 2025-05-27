@@ -27,10 +27,20 @@ from azure.mgmt.managementgroups import ManagementGroupsAPI
 import csv
 import logging
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Mapping
 import time
 
 log = logging.getLogger("fabric_friend")
+
+# Define schemas for different CSV file types
+CSV_SCHEMAS = {
+    'subscriptions': ['subscription_id', 'display_name', 'state', 'tenant_id', 'authorization_source', 'managed_by_tenants'],
+    'management_groups': ['id', 'name', 'display_name', 'tenant_id', 'type'],
+    'resource_groups': ['subscription_id', 'name', 'location', 'id', 'type', 'provisioning_state', 'tags'],
+    'resources': ['subscription_id', 'resource_group', 'name', 'type', 'location', 'id', 'kind', 'sku', 'tags'],
+    # Generic fallback for unknown file types
+    'default': ['id', 'name', 'type']
+}
 
 class AzureTopologyManager:
     """Manager for collecting Azure topology data including subscriptions, management groups, and resources."""
@@ -238,18 +248,33 @@ class AzureTopologyManager:
 _topology_manager = None
 
 def _write_csv(file_path: str, data: List[Dict]) -> None:
-    """Write a list of dictionaries to a CSV file."""
-    if not data:
-        log.warning(f"No data to write to {file_path}")
-        return
-
+    """Write a list of dictionaries to a CSV file. Always creates the file with headers even if there's no data."""
     try:
-        fieldnames = sorted({key for item in data for key in item.keys()})
+        if not data:
+            log.warning(f"No data to write to {file_path}, creating file with headers only")
+            # For empty datasets, use predefined headers from CSV_SCHEMAS
+            file_name = os.path.basename(file_path)
+            
+            # Find the matching schema based on filename
+            schema_key = 'default'
+            for key in CSV_SCHEMAS:
+                if key in file_name:
+                    schema_key = key
+                    break
+            
+            fieldnames = CSV_SCHEMAS[schema_key]
+        else:
+            # Extract field names from the data if we have it
+            fieldnames = sorted({key for item in data for key in item.keys()})
+        
         with open(file_path, "w", newline="", encoding="utf-8") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerows(data)
-        log.info(f"Successfully wrote {len(data)} records to {file_path}")
+            if data:
+                writer.writerows(data)
+        
+        record_count = len(data) if data else 0
+        log.info(f"Successfully wrote {record_count} records to {file_path}")
     except Exception as e:
         log.error(f"Failed to write CSV file {file_path}: {e}")
         raise
