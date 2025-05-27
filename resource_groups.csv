@@ -1,0 +1,2 @@
+id,location,name,provisioning_state,subscription_id,tags,type
+/subscriptions/73515f85-5a1f-4d98-a1ae-64f54c962d88/resourceGroups/Individual-Jack_Latrobe,australiaeast,Individual-Jack_Latrobe,Succeeded,73515f85-5a1f-4d98-a1ae-64f54c962d88,{'owner': 'Jack Latrobe'},Microsoft.Resources/resourceGroups

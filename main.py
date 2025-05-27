@@ -95,9 +95,17 @@ def run_module(args):
         module_args.pop("command", None)
         module_args.pop("func", None)
         
+        # Map CLI module names to actual module names if needed
+        module_name_map = {
+            "topology": "azure_topology"
+        }
+        
+        # Use the mapped module name if available, otherwise use the original
+        actual_module_name = module_name_map.get(args.module_name, args.module_name)
+        
         # Load and run the module with the specified command
         result = load_and_run(
-            f"modules.{args.module_name}", 
+            f"modules.{actual_module_name}", 
             module_args, 
             args.command if hasattr(args, "command") and args.command else None
         )
@@ -160,19 +168,18 @@ def main():
     # Power BI scan-data command
     powerbi_scan_parser = powerbi_subparsers.add_parser("scan-data", help="Scan Power BI data")
     powerbi_scan_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
-    powerbi_scan_parser.add_argument("-i", "--instance-id", help="Instance ID")
-      # Azure Topology module
+    powerbi_scan_parser.add_argument("-i", "--instance-id", help="Instance ID")    # Azure Topology module
     topology_parser = subparsers.add_parser("topology", help="Azure resource topology operations")
     topology_subparsers = topology_parser.add_subparsers(dest="command", help="Command to run")
     
     # Azure Topology collect command (default)
     topology_collect_parser = topology_subparsers.add_parser("collect", help="Collect Azure topology data (subscriptions, management groups, resource groups, resources)")
-    topology_collect_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
+    topology_collect_parser.add_argument("-s", "--subscription-id", required=False, help="Azure Subscription ID (optional - will collect data from all accessible subscriptions if not specified)")
     topology_collect_parser.add_argument("-o", "--output-dir", default=".", help="Output directory for CSV files (default: current directory)")
     
     # Azure Topology visualize command
     topology_visualize_parser = topology_subparsers.add_parser("visualize", help="Visualize Azure resource topology")
-    topology_visualize_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
+    topology_visualize_parser.add_argument("-s", "--subscription-id", required=False, help="Azure Subscription ID (optional - will visualize all accessible subscriptions if not specified)")
     topology_visualize_parser.add_argument("-t", "--resource-type", help="Resource type filter")
     
     # Authentication module

@@ -1,0 +1,2 @@
+authorization_source,display_name,managed_by_tenants,state,subscription_id,tenant_id
+RoleBased,Partner_Credit-01,[<azure.mgmt.resource.subscriptions.v2022_12_01.models._models_py3.ManagedByTenant object at 0x000002D5C78A5D30>],Enabled,73515f85-5a1f-4d98-a1ae-64f54c962d88,b0fcafb5-5948-4c94-ba5d-d171557663a2

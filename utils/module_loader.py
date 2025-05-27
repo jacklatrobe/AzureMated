@@ -76,7 +76,12 @@ def load_and_run(module_name: str, args: Optional[Dict[str, Any]] = None, comman
         # Determine which function to call
         func_name = command if command else "run"
         
-        # Check if the module has the requested function
+        # If the specific command function doesn't exist, fall back to the default 'run' function
+        if command and not hasattr(module, func_name):
+            log.warning(f"Module {module_name} does not have a {func_name} function, falling back to 'run'")
+            func_name = "run"
+        
+        # At this point, the module MUST have at least the 'run' function
         if not hasattr(module, func_name):
             log.error(f"Module {module_name} does not have a {func_name} function")
             raise AttributeError(f"Module {module_name} does not have a {func_name} function")
@@ -84,13 +89,21 @@ def load_and_run(module_name: str, args: Optional[Dict[str, Any]] = None, comman
         # Get the function to execute
         func = getattr(module, func_name)
         
-        # Execute the function with the provided arguments
+        # Execute the function with the provided arguments, passing command if using 'run'
         log.info(f"Executing {module_name}.{func_name}()")
-        return func(**args)
+        if func_name == "run" and command:
+            # If we're using the default run function with a specific command, pass the command name
+            args_with_command = args.copy()
+            args_with_command["command"] = command
+            return func(**args_with_command)
+        else:
+            return func(**args)
         
     except ImportError as e:
         log.error(f"Failed to import module {module_name}: {str(e)}")
         raise
     except Exception as e:
-        log.error(f"Error executing {func_name} in {module_name}: {str(e)}")
+        # Use the most recently used func_name or a default value if we didn't get that far
+        current_func = locals().get("func_name", "unknown")
+        log.error(f"Error executing {current_func} in {module_name}: {str(e)}")
         raise

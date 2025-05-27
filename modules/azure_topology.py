@@ -35,13 +35,13 @@ log = logging.getLogger("fabric_friend")
 class AzureTopologyManager:
     """Manager for collecting Azure topology data including subscriptions, management groups, and resources."""
     
-    def __init__(self, credential: ChainedTokenCredential, subscription_id: str):
+    def __init__(self, credential: ChainedTokenCredential, subscription_id: Optional[str] = None):
         """
         Initialize the AzureTopologyManager.
         
         Args:
             credential: The Azure credential using chained authentication
-            subscription_id: The Azure subscription ID
+            subscription_id: Optional Azure subscription ID for specific operations
         """
         self.credential = credential
         self.subscription_id = subscription_id
@@ -124,6 +124,7 @@ class AzureTopologyManager:
         
         Returns:
             List of dictionaries containing management group information
+            Empty list if unauthorized or error occurs
         """
         log.info("Fetching management groups")
         management_groups = []
@@ -135,25 +136,30 @@ class AzureTopologyManager:
             for attempt in range(3):
                 try:
                     for mg in client.management_groups.list():
+                        # Handle potential attribute errors by using getattr with defaults
                         mg_dict = {
-                            'id': mg.id,
-                            'name': mg.name,
-                            'display_name': mg.display_name,
+                            'id': getattr(mg, 'id', ''),
+                            'name': getattr(mg, 'name', ''),
+                            'display_name': getattr(mg, 'display_name', ''),
                             'tenant_id': getattr(mg, 'tenant_id', ''),
-                            'type': mg.type,
+                            'type': getattr(mg, 'type', ''),
                         }
                         management_groups.append(mg_dict)
                     break
                 except Exception as e:
                     if attempt == 2:  # Last attempt
+                        # Log error but don't raise
                         log.error(f"Failed to fetch management groups after 3 attempts: {e}")
-                        raise AzureError(f"Failed to fetch management groups: {e}")
+                        log.warning("Continuing without management groups data")
+                        return []
                     log.warning(f"Attempt {attempt + 1} failed, retrying: {e}")
-                    time.sleep(2 ** attempt)
+                    time.sleep(2 ** attempt)  # Exponential backoff
                     
         except Exception as e:
+            # Log error but don't raise
             log.error(f"Error fetching management groups: {e}")
-            raise
+            log.warning("Continuing without management groups data")
+            return []
             
         log.info(f"Found {len(management_groups)} management groups")
         return management_groups
@@ -248,7 +254,7 @@ def _write_csv(file_path: str, data: List[Dict]) -> None:
         log.error(f"Failed to write CSV file {file_path}: {e}")
         raise
 
-def run(subscription_id=None, output_dir: str = ".", **kwargs):
+def run(subscription_id=None, output_dir: str = ".", command=None, **kwargs):
     """
     Run the Azure Topology module functionality.
     
@@ -263,8 +269,9 @@ def run(subscription_id=None, output_dir: str = ".", **kwargs):
     - It must return a dictionary with the results
     
     Args:
-        subscription_id: The Azure subscription ID (used for authentication context)
+        subscription_id: Optional Azure subscription ID to filter results. If None, collects data from all accessible subscriptions.
         output_dir: Directory where CSV files will be written
+        command: The command being executed, used when a specific command function doesn't exist
         **kwargs: Additional arguments
         
     Returns:
@@ -276,15 +283,11 @@ def run(subscription_id=None, output_dir: str = ".", **kwargs):
     
     log.info("Running Azure Topology data collection")
     
-    # Validate required parameters
-    if not subscription_id:
-        raise ValueError("Subscription ID is required")
-    
     # Initialize the credential
     credential = initialize_credential()
     
     # Create or reuse the topology manager
-    if _topology_manager is None or _topology_manager.subscription_id != subscription_id:
+    if _topology_manager is None or (subscription_id and _topology_manager.subscription_id != subscription_id):
         _topology_manager = AzureTopologyManager(credential, subscription_id)
 
     try:
@@ -304,7 +307,15 @@ def run(subscription_id=None, output_dir: str = ".", **kwargs):
         all_resource_groups = []
         all_resources = []
         
-        for subscription in subscriptions:
+        # Filter subscriptions if a specific subscription_id is provided
+        target_subscriptions = subscriptions
+        if subscription_id:
+            target_subscriptions = [sub for sub in subscriptions if sub['subscription_id'] == subscription_id]
+            if not target_subscriptions:
+                log.warning(f"Specified subscription {subscription_id} not found or not accessible")
+                console.print(f"[yellow]Warning: Subscription {subscription_id} not found or not accessible[/yellow]")
+        
+        for subscription in target_subscriptions:
             sub_id = subscription['subscription_id']
             console.print(f"[yellow]Processing subscription: {subscription['display_name']} ({sub_id})[/yellow]")
             
