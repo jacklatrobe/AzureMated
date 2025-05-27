@@ -100,8 +100,8 @@ class TestMainApplication:
         # Mock argparse.ArgumentParser to avoid actual CLI parsing
         mock_parser = MagicMock()
         mock_args = MagicMock()
-        mock_args.module_name = "fabric"
-        mock_args.command = "list"
+        mock_args.module_name = "topology"
+        mock_args.command = "collect"
         
         # Setup the parser to return our mock args
         mock_parser.parse_args.return_value = mock_args

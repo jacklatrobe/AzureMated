@@ -14,7 +14,7 @@ from rich.logging import RichHandler
 from typing import Optional, List
 
 # Import modules and utilities
-from modules import FabricManager, PowerBIManager
+from modules import PowerBIManager
 from utils import initialize_credential, console, display_results, check_azure_auth, load_and_run
 
 # Configure logging
@@ -119,20 +119,6 @@ def main():
     
     # Create subparsers for modules
     subparsers = parser.add_subparsers(dest="module_name", help="Module to run")
-    
-    # Fabric module
-    fabric_parser = subparsers.add_parser("fabric", help="Microsoft Fabric operations")
-    fabric_subparsers = fabric_parser.add_subparsers(dest="command", help="Command to run")
-    
-    # Fabric list command
-    fabric_list_parser = fabric_subparsers.add_parser("list", help="List Microsoft Fabric instances")
-    fabric_list_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
-    fabric_list_parser.add_argument("-g", "--resource-group", help="Resource group name")
-    
-    # Fabric get command
-    fabric_get_parser = fabric_subparsers.add_parser("get", help="Get Microsoft Fabric instance details")
-    fabric_get_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
-    fabric_get_parser.add_argument("-i", "--instance-id", required=True, help="Instance ID")
     
     # Power BI module
     powerbi_parser = subparsers.add_parser("powerbi", help="Power BI operations")

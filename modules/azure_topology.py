@@ -344,7 +344,8 @@ def visualize(output_dir: str = "./outputs") -> Dict:
     """
     from utils import console
     from utils.visualisations import create_azure_topology_visualizations
-      console.print("[yellow]Running visualization only. For best results, run 'topology collect' first.[/yellow]")
+    
+    console.print("[yellow]Running visualization only. For best results, run 'topology collect' first.[/yellow]")
     console.print("[blue]Running Azure Topology visualization...[/blue]")
     
     viz_success = create_azure_topology_visualizations(output_dir, CSV_SCHEMAS)

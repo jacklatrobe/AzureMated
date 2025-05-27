@@ -13,7 +13,6 @@ import csv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.csv_writer import write_csv, write_csv_with_schema
-from utils.visualisations import create_visualization_csv
 
 
 class TestCSVIntegration:
@@ -46,8 +45,7 @@ class TestCSVIntegration:
             # Verify both files exist and have correct structure
             assert os.path.exists(filename_a)
             assert os.path.exists(filename_b)
-            
-            # Check Module A CSV
+              # Check Module A CSV
             with open(filename_a, 'r', newline='', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 assert reader.fieldnames == module_a_schema
@@ -90,12 +88,10 @@ class TestCSVIntegration:
             ]
             
             for dataset in test_datasets:
-                filepath = os.path.join(temp_dir, dataset["filename"])
-                
-                # Simulate visualization utility using CSV writer
-                create_visualization_csv(
+                filepath = os.path.join(temp_dir, dataset["filename"])                # Simulate visualization utility using CSV writer
+                write_csv_with_schema(
+                    file_path=filepath,
                     data=dataset["data"],
-                    filename=filepath,
                     schema=dataset["schema"]
                 )
                 
@@ -145,18 +141,19 @@ class TestCSVIntegration:
             # Verify both work independently
             assert os.path.exists(simple_file)
             assert os.path.exists(complex_file)
-            
-            # Check simple CSV
+              # Check simple CSV
             with open(simple_file, 'r', newline='', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
-                assert len(reader.fieldnames) == 2
+                fieldnames = reader.fieldnames or []
+                assert len(fieldnames) == 2
                 rows = list(reader)
                 assert len(rows) == 1
             
             # Check complex CSV
             with open(complex_file, 'r', newline='', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
-                assert len(reader.fieldnames) == 9
+                fieldnames = reader.fieldnames or []
+                assert len(fieldnames) == 9
                 rows = list(reader)
                 assert len(rows) == 1
                 assert rows[0]["resource_name"] == "vm-web-01"
@@ -184,18 +181,46 @@ class TestCSVIntegration:
                 {"expected_field": "value2", "another_extra": "also_unexpected"}
             ]
             mismatched_schema = ["expected_field"]
-            mismatched_file = os.path.join(temp_dir, "mismatched.csv")
-            
-            # Should still work, only writing fields that are in schema
+            mismatched_file = os.path.join(temp_dir, "mismatched.csv")            # Should still work, only writing fields that are in schema
             write_csv_with_schema(mismatched_file, mismatched_data, mismatched_schema)
             assert os.path.exists(mismatched_file)
             
             with open(mismatched_file, 'r', newline='', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
-                assert reader.fieldnames == ["expected_field"]
+                fieldnames = reader.fieldnames or []
+                # CSV writer should only include fields from schema, not extra fields from data
+                assert fieldnames == ["expected_field"]
                 rows = list(reader)
                 assert len(rows) == 2
-                assert "extra_field" not in reader.fieldnames
+                # The main field should still be present
+                assert rows[0]["expected_field"] == "value1"                # Extra fields should not be included
+                assert "extra_field" not in fieldnames
+                assert "another_extra" not in fieldnames
+
+            # Test 3: Schema fields missing from data (should create empty columns)
+            incomplete_data = [
+                {"present_field": "value1"},  # missing optional_field
+                {"present_field": "value2", "optional_field": "has_value"}  # has optional_field
+            ]
+            complete_schema = ["present_field", "optional_field"]
+            incomplete_file = os.path.join(temp_dir, "incomplete.csv")
+            
+            write_csv_with_schema(incomplete_file, incomplete_data, complete_schema)
+            assert os.path.exists(incomplete_file)
+            
+            with open(incomplete_file, 'r', newline='', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames or []
+                # Should have all schema fields even if some data rows don't have them
+                assert fieldnames == complete_schema
+                rows = list(reader)
+                assert len(rows) == 2
+                # First row should have empty/None for missing field
+                assert rows[0]["present_field"] == "value1"
+                assert rows[0]["optional_field"] == "" or rows[0]["optional_field"] is None
+                # Second row should have both fields
+                assert rows[1]["present_field"] == "value2"
+                assert rows[1]["optional_field"] == "has_value"
 
     def test_backward_compatibility_integration(self):
         """Test that the old write_csv function still works alongside new functionality"""
@@ -233,8 +258,7 @@ class TestCSVIntegration:
                 {"id": "resource-123", "name": "web-server", "type": "vm", "region": "us-east"},
                 {"id": "resource-456", "name": "database", "type": "sql", "region": "us-west"}
             ]
-            
-            # Module B wants to process this data with its own schema
+              # Module B wants to process this data with its own schema
             # (maybe it only cares about certain fields or wants different headers)
             module_b_schema = ["id", "name", "region"]  # Excludes 'type'
             
@@ -245,7 +269,9 @@ class TestCSVIntegration:
             
             with open(processed_file, 'r', newline='', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
-                assert reader.fieldnames == module_b_schema
+                fieldnames = reader.fieldnames or []
+                # CSV writer should only include fields from schema, not extra fields from data
+                assert fieldnames == module_b_schema
                 rows = list(reader)
                 assert len(rows) == 2
                 # Should have the fields Module B cares about
@@ -253,7 +279,7 @@ class TestCSVIntegration:
                 assert rows[0]["name"] == "web-server"
                 assert rows[0]["region"] == "us-east"
                 # Should not have the 'type' field that Module B didn't include in schema
-                assert "type" not in reader.fieldnames
+                assert "type" not in fieldnames
 
     def test_utils_independence_verification(self):
         """Verify that utils can be used without importing any modules"""
