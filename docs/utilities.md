@@ -131,6 +131,25 @@ write_csv("output.csv", data_list)
 - **Modularity**: No circular dependencies - modules pass their schema to the utility
 - **Flexibility**: Accommodates additional columns in data that aren't in the base schema
 
+## Visualization Utilities (`visualisations.py`)
+
+These helpers use `networkx` and `matplotlib` to draw Azure topology diagrams.
+
+### `create_azure_topology_visualizations(output_dir, csv_schemas=None)`
+Reads CSV exports from `output_dir` and generates a set of hierarchy images.
+
+### `create_mgmt_group_subscription_viz(mgmt_groups_df, subscriptions_df, output_dir)`
+Shows management groups linked to their subscriptions.
+
+### `create_subscription_resource_group_viz(subscriptions_df, resource_groups_df, output_dir)`
+Plots subscriptions and their resource groups.
+
+### `create_resource_group_resources_viz(resource_groups_df, resources_df, output_dir)`
+Aggregates resources by type and creates a diagram for each resource group.
+
+### `create_complete_hierarchy_viz(mgmt_groups_df, subscriptions_df, resource_groups_df, resources_df, output_dir)`
+Builds a comprehensive hierarchy diagram combining all data.
+
 ## Usage in Main Program
 
 The utilities are used throughout the main program to:
