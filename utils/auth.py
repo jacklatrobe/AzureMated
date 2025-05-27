@@ -1,7 +1,7 @@
 """
 Authentication Utilities
 
-This module contains functions for authenticating with Azure and Microsoft 365.
+This module contains functions for authenticating with Azure using CLI credentials and MSAL.
 """
 
 import logging
@@ -51,12 +51,44 @@ def check_azure_auth():
     except Exception:
         return False
 
-def check_microsoft365_auth():
+def get_msal_token(scopes):
     """
-    Check authentication status with Microsoft 365.
-    
+    Acquire and cache an access token for the specified scopes using MSAL with device flow.
+    Requires FABRICFRIEND_CLIENT_ID and FABRICFRIEND_TENANT_ID environment variables.
     Returns:
-        bool: True if authentication is successful, False otherwise
+        str: Access token
     """
-    # TODO: Implement Microsoft 365 authentication check
-    return False
+    import os
+    from msal import PublicClientApplication, SerializableTokenCache
+
+    # Configuration from environment
+    client_id = os.getenv("FABRICFRIEND_CLIENT_ID")
+    tenant_id = os.getenv("FABRICFRIEND_TENANT_ID")
+    if not client_id or not tenant_id:
+        raise Exception("Environment variables FABRICFRIEND_CLIENT_ID and FABRICFRIEND_TENANT_ID must be set for MSAL authentication")
+    # Token cache file
+    cache_path = os.path.expanduser("~/.fabricfriend_token_cache.bin")
+    cache = SerializableTokenCache()
+    if os.path.exists(cache_path):
+        cache.deserialize(open(cache_path, "r").read())
+    authority = f"https://login.microsoftonline.com/{tenant_id}"
+    app = PublicClientApplication(client_id, authority=authority, token_cache=cache)
+
+    # Attempt silent auth
+    result = app.acquire_token_silent(scopes, account=None)
+    if not result:
+        # Interactive device code flow
+        flow = app.initiate_device_flow(scopes=scopes)
+        if "message" in flow:
+            print(flow["message"], flush=True)
+        result = app.acquire_token_by_device_flow(flow)
+
+    if not result or "access_token" not in result:
+        error = result.get("error_description") if result else "Unknown error"
+        raise Exception(f"Failed to acquire MSAL token: {error}")
+
+    # Persist cache
+    with open(cache_path, "w") as f:
+        f.write(cache.serialize())
+
+    return result["access_token"]

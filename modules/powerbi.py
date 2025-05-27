@@ -23,6 +23,7 @@ When creating new modules, follow this pattern to ensure compatibility with the 
 
 from azure.identity import ChainedTokenCredential
 from azure.core.exceptions import AzureError
+from utils import get_msal_token
 import csv
 import logging
 import os
@@ -46,10 +47,13 @@ class PowerBIManager:
     # ------------------------------------------------------------------
     def _get_access_token(self) -> str:
         """Acquire an access token for the Power BI API."""
-        if not self._token:
-            scope = "https://analysis.windows.net/powerbi/api/.default"
-            self._token = self.credential.get_token(scope).token
-        return self._token
+        if self._token:
+            return self._token
+        # Acquire new token via MSAL with caching
+        scope = "https://analysis.windows.net/powerbi/api/.default"
+        token = get_msal_token([scope])
+        self._token = token
+        return token
 
     def _api_get(self, path: str, params: Optional[Dict[str, str]] = None) -> List[Dict]:
         """Call a Power BI Admin GET endpoint and return the aggregated results."""
@@ -167,7 +171,8 @@ def run(subscription_id=None, output_dir: str = ".", **kwargs):
     datasets: List[Dict] = []
 
     for g in groups:
-        gid = g.get("id")
+        # assume 'id' always present
+        gid: str = g["id"]
         users.extend([{"workspaceId": gid, **u} for u in _powerbi_manager.get_group_users(gid)])
         dashboards.extend([{"workspaceId": gid, **d} for d in _powerbi_manager.get_dashboards(gid)])
         dataflows.extend([{"workspaceId": gid, **df} for df in _powerbi_manager.get_dataflows(gid)])

@@ -15,7 +15,7 @@ from typing import Optional, List
 
 # Import modules and utilities
 from modules import FabricManager, PowerBIManager
-from utils import initialize_credential, console, display_results, check_azure_auth, check_microsoft365_auth, load_and_run
+from utils import initialize_credential, console, display_results, check_azure_auth, load_and_run
 
 # Configure logging
 logging.basicConfig(
@@ -66,7 +66,7 @@ def list_powerbi_premium(args):
 
 def check_auth(args):
     """
-    Check authentication status with Azure and Microsoft 365.
+    Check authentication status with Azure.
     
     Args:
         args: Command line arguments
@@ -79,13 +79,6 @@ def check_auth(args):
         console.print("✅ [green]Azure authentication successful[/green]")
     else:
         console.print("❌ [red]Azure authentication failed[/red]")
-    
-    # Check Microsoft 365 authentication
-    m365_auth_success = check_microsoft365_auth()
-    if m365_auth_success:
-        console.print("✅ [green]Microsoft 365 authentication successful[/green]")
-    else:
-        console.print("[yellow]Microsoft 365 authentication check not yet implemented[/yellow]")
 
 def run_module(args):
     """
