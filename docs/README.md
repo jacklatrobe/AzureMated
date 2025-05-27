@@ -11,6 +11,7 @@ This directory contains comprehensive documentation for the FabricFriend project
 5. [Templates](templates.md) - Code templates for new modules
 6. [Utilities](utilities.md) - Common functionality and helper classes
 7. [Authentication](authentication.md) - Azure authentication and credential management
+8. [Visualization Utilities](visualiser.md) - Generating Azure topology diagrams
 
 ## Quick Start for Module Development
 
