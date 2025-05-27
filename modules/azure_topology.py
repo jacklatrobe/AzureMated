@@ -276,16 +276,13 @@ def _write_csv(file_path: str, data: List[Dict]) -> None:
         log.error(f"Failed to write CSV file {file_path}: {e}")
         raise
 
-def run(subscription_id=None, output_dir: str = "./outputs", command=None, resource_type=None, **kwargs):
+def run(subscription_id=None, output_dir: str = "./outputs", command=None, **kwargs):
     """
     Run the Azure Topology module functionality.
     
     This function is called by the module_loader and serves as the entry point
-    for this module. It collects Azure topology data including subscriptions,
-    management groups, resource groups, and resources, then writes them to CSV files.
-    
-    For 'collect' command: Gathers data and saves to CSV
-    For 'visualize' command: Creates visualizations from the collected data
+    for this module. By default, it both collects Azure topology data and creates
+    visualizations from that data in sequence.
     
     Module Loader Integration:
     - This function must be defined at the module level (not inside a class)
@@ -299,10 +296,11 @@ def run(subscription_id=None, output_dir: str = "./outputs", command=None, resou
         command: The command being executed ('collect' or 'visualize')
         resource_type: Optional filter for resource types (used in visualization)
         **kwargs: Additional arguments
-        
+    
     Returns:
         Dictionary with the results of the operation including counts of collected items
     """
+    
     from utils import initialize_credential, console
     
     global _topology_manager
@@ -314,15 +312,16 @@ def run(subscription_id=None, output_dir: str = "./outputs", command=None, resou
     
     # Create or reuse the topology manager
     if _topology_manager is None or (subscription_id and _topology_manager.subscription_id != subscription_id):
-        _topology_manager = AzureTopologyManager(credential, subscription_id)    try:
+        _topology_manager = AzureTopologyManager(credential, subscription_id)
+      try:
         # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
         
         # Handle different commands
         if command == 'visualize':
-            # For visualization command, create visualizations from existing data
+            console.print("[yellow]Running visualization only. For best results, run 'topology collect' first.[/yellow]")
             console.print("[blue]Running Azure Topology visualization...[/blue]")
-            viz_success = _create_visualizations(output_dir, resource_type_filter=resource_type)
+            viz_success = _create_visualizations(output_dir)
             
             if viz_success:
                 console.print("[green]Azure Topology Visualization Complete![/green]")
@@ -330,79 +329,91 @@ def run(subscription_id=None, output_dir: str = "./outputs", command=None, resou
             else:
                 console.print("[red]Azure Topology Visualization Failed![/red]")
                 return {"status": "error", "message": "Failed to create visualizations"}
-        else:
-            # Default to 'collect' command
-            # Collect subscriptions data
-            console.print("[blue]Collecting subscription information...[/blue]")
-            subscriptions = _topology_manager.get_subscriptions()
+        
+        # Default behavior: collect data first, then visualize
+        # (command is None or command == 'collect')
+        # Collect subscriptions data
+        console.print("[blue]Collecting subscription information...[/blue]")
+        subscriptions = _topology_manager.get_subscriptions()
+        
+        # Collect management groups data
+        console.print("[blue]Collecting management groups...[/blue]")
+        management_groups = _topology_manager.get_management_groups()
+        
+        # Collect resource groups and resources for all accessible subscriptions
+        console.print("[blue]Collecting resource groups and resources...[/blue]")
+        all_resource_groups = []
+        all_resources = []
+        
+        # Filter subscriptions if a specific subscription_id is provided
+        target_subscriptions = subscriptions
+        if subscription_id:
+            target_subscriptions = [sub for sub in subscriptions if sub['subscription_id'] == subscription_id]
+            if not target_subscriptions:
+                log.warning(f"Specified subscription {subscription_id} not found or not accessible")
+                console.print(f"[yellow]Warning: Subscription {subscription_id} not found or not accessible[/yellow]")
+        
+        for subscription in target_subscriptions:
+            sub_id = subscription['subscription_id']
+            console.print(f"[yellow]Processing subscription: {subscription['display_name']} ({sub_id})[/yellow]")
             
-            # Collect management groups data
-            console.print("[blue]Collecting management groups...[/blue]")
-            management_groups = _topology_manager.get_management_groups()
-            
-            # Collect resource groups and resources for all accessible subscriptions
-            console.print("[blue]Collecting resource groups and resources...[/blue]")
-            all_resource_groups = []
-            all_resources = []
-            
-            # Filter subscriptions if a specific subscription_id is provided
-            target_subscriptions = subscriptions
-            if subscription_id:
-                target_subscriptions = [sub for sub in subscriptions if sub['subscription_id'] == subscription_id]
-                if not target_subscriptions:
-                    log.warning(f"Specified subscription {subscription_id} not found or not accessible")
-                    console.print(f"[yellow]Warning: Subscription {subscription_id} not found or not accessible[/yellow]")
-            
-            for subscription in target_subscriptions:
-                sub_id = subscription['subscription_id']
-                console.print(f"[yellow]Processing subscription: {subscription['display_name']} ({sub_id})[/yellow]")
-                
-                try:
-                    resource_groups, resources = _topology_manager.get_resource_groups_and_resources(sub_id)
-                    all_resource_groups.extend(resource_groups)
-                    all_resources.extend(resources)
-                except Exception as e:
-                    log.warning(f"Failed to process subscription {sub_id}: {e}")
-                    console.print(f"[red]Warning: Could not access subscription {sub_id}: {e}[/red]")
-                    continue
-            
-            # Write CSV files
-            console.print("[blue]Writing CSV files...[/blue]")
-            _write_csv(os.path.join(output_dir, "subscriptions.csv"), subscriptions)
-            _write_csv(os.path.join(output_dir, "management_groups.csv"), management_groups)
-            _write_csv(os.path.join(output_dir, "resource_groups.csv"), all_resource_groups)
-            _write_csv(os.path.join(output_dir, "resources.csv"), all_resources)
+            try:
+                resource_groups, resources = _topology_manager.get_resource_groups_and_resources(sub_id)
+                all_resource_groups.extend(resource_groups)
+                all_resources.extend(resources)
+            except Exception as e:
+                log.warning(f"Failed to process subscription {sub_id}: {e}")
+                console.print(f"[red]Warning: Could not access subscription {sub_id}: {e}[/red]")
+                continue
+        
+        # Write CSV files
+        console.print("[blue]Writing CSV files...[/blue]")
+        _write_csv(os.path.join(output_dir, "subscriptions.csv"), subscriptions)
+        _write_csv(os.path.join(output_dir, "management_groups.csv"), management_groups)
+        _write_csv(os.path.join(output_dir, "resource_groups.csv"), all_resource_groups)
+        _write_csv(os.path.join(output_dir, "resources.csv"), all_resources)
+        
+        # Create summary
+        summary = {
+            "subscriptions": len(subscriptions),
+            "management_groups": len(management_groups),
+            "resource_groups": len(all_resource_groups),
+            "resources": len(all_resources),
+        }
 
-            # Create summary
-            summary = {
-                "subscriptions": len(subscriptions),
-                "management_groups": len(management_groups),
-                "resource_groups": len(all_resource_groups),
-                "resources": len(all_resources),
-            }
-
-            console.print(
-                f"[green]Azure Topology Collection Complete![/green]\n"
-                f"[green]• Subscriptions: {summary['subscriptions']}[/green]\n"
-                f"[green]• Management Groups: {summary['management_groups']}[/green]\n"
-                f"[green]• Resource Groups: {summary['resource_groups']}[/green]\n"
-                f"[green]• Resources: {summary['resources']}[/green]"
-            )
-
-            return {"summary": summary}
+        console.print(
+            f"[green]Azure Topology Collection Complete![/green]\n"
+            f"[green]• Subscriptions: {summary['subscriptions']}[/green]\n"
+            f"[green]• Management Groups: {summary['management_groups']}[/green]\n"
+            f"[green]• Resource Groups: {summary['resource_groups']}[/green]\n"
+            f"[green]• Resources: {summary['resources']}[/green]"
+        )
+          # If this is a direct run (no command) or explicitly collect command, 
+        # follow up with visualization automatically
+        if command is None:
+            console.print("[blue]Running Azure Topology visualization...[/blue]")
+            viz_success = _create_visualizations(output_dir)
+            
+            if viz_success:
+                console.print("[green]Azure Topology Visualization Complete![/green]")
+                return {"summary": summary, "visualization": "success"}
+            else:
+                console.print("[red]Azure Topology Visualization Failed![/red]")
+                return {"summary": summary, "visualization": "failed"}
+        
+        return {"summary": summary}
         
     except Exception as e:
         log.error(f"Failed to collect Azure topology data: {e}")
         console.print(f"[red]Error: {e}[/red]")
         raise
 
-def _create_visualizations(output_dir: str, resource_type_filter: Optional[str] = None):
+def _create_visualizations(output_dir: str):
     """
     Create visualizations from collected Azure topology data.
     
     Args:
         output_dir: Directory where the CSV files are located and where visualizations will be saved
-        resource_type_filter: Optional filter to include only specific resource types
     """
     from utils import console
     
@@ -440,11 +451,6 @@ def _create_visualizations(output_dir: str, resource_type_filter: Optional[str] 
         
         resource_groups_df = pd.read_csv(resource_groups_file)
         resources_df = pd.read_csv(resources_file)
-        
-        # Apply resource type filter if specified
-        if resource_type_filter:
-            resources_df = resources_df[resources_df['type'].str.contains(resource_type_filter, na=False)]
-            console.print(f"[yellow]Applied resource type filter: {resource_type_filter}[/yellow]")
         
         # Create the visualizations
         console.print("[yellow]Creating visualizations...[/yellow]")
@@ -506,11 +512,17 @@ def _create_mgmt_group_subscription_viz(mgmt_groups_df, subscriptions_df, output
         
         # Create visualization
         plt.figure(figsize=(12, 8))
-        pos = nx.spring_layout(G, seed=42)
+        pos = nx.spring_layout(G, seed=42)        # Draw nodes - group by type for consistent coloring
+        mgmt_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'management_group']
+        sub_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'subscription']
         
-        # Draw nodes
-        node_colors = ['#4287f5' if G.nodes[n]['type'] == 'management_group' else '#42c5f5' for n in G.nodes]
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=500, alpha=0.8)
+        # Draw management group nodes
+        if mgmt_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=mgmt_nodes, node_color='#4287f5', node_size=500, alpha=0.8)
+        
+        # Draw subscription nodes
+        if sub_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=sub_nodes, node_color='#42c5f5', node_size=500, alpha=0.8)
         
         # Draw edges
         nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=15, width=1.0)
@@ -558,10 +570,17 @@ def _create_subscription_resource_group_viz(subscriptions_df, resource_groups_df
         # Create visualization
         plt.figure(figsize=(14, 10))
         pos = nx.spring_layout(G, seed=42)
+          # Draw nodes by type for consistent coloring
+        sub_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'subscription']
+        rg_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'resource_group']
         
-        # Draw nodes
-        node_colors = ['#4287f5' if G.nodes[n]['type'] == 'subscription' else '#42f59e' for n in G.nodes]
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=500, alpha=0.8)
+        # Draw subscription nodes
+        if sub_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=sub_nodes, node_color='#4287f5', node_size=500, alpha=0.8)
+        
+        # Draw resource group nodes
+        if rg_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=rg_nodes, node_color='#42f59e', node_size=500, alpha=0.8)
         
         # Draw edges
         nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=15, width=1.0)
@@ -637,16 +656,17 @@ def _create_resource_group_resources_viz(resource_groups_df, resources_df, outpu
         # Create visualization
         plt.figure(figsize=(16, 12))
         pos = nx.spring_layout(G, seed=42)
+          # Draw nodes by type for consistent coloring
+        rg_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'resource_group']
+        resource_type_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'resource_type']
         
-        # Draw nodes
-        node_colors = []
-        for n in G.nodes:
-            if G.nodes[n]['type'] == 'resource_group':
-                node_colors.append('#42f59e')
-            else:
-                node_colors.append('#f5d442')
+        # Draw resource group nodes
+        if rg_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=rg_nodes, node_color='#42f59e', node_size=500, alpha=0.8)
         
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=500, alpha=0.8)
+        # Draw resource type nodes
+        if resource_type_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=resource_type_nodes, node_color='#f5d442', node_size=500, alpha=0.8)
         
         # Draw edges
         nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=15, width=1.0)
@@ -745,21 +765,27 @@ def _create_complete_hierarchy_viz(mgmt_groups_df, subscriptions_df, resource_gr
         
         # Use hierarchical layout
         pos = nx.nx_agraph.graphviz_layout(G, prog='dot', args='-Grankdir=TB')
+          # Draw nodes by type for consistent coloring
+        mgmt_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'management_group']
+        sub_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'subscription']
+        rg_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'resource_group']
+        resource_type_nodes = [n for n in G.nodes if G.nodes[n]['type'] == 'resource_type']
         
-        # Draw nodes with different colors per level
-        node_colors = []
-        for n in G.nodes:
-            node_type = G.nodes[n]['type']
-            if node_type == 'management_group':
-                node_colors.append('#4287f5')  # Blue
-            elif node_type == 'subscription':
-                node_colors.append('#42c5f5')  # Light blue
-            elif node_type == 'resource_group':
-                node_colors.append('#42f59e')  # Green
-            else:
-                node_colors.append('#f5d442')  # Yellow
+        # Draw management group nodes
+        if mgmt_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=mgmt_nodes, node_color='#4287f5', node_size=400, alpha=0.8)  # Blue
         
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=400, alpha=0.8)
+        # Draw subscription nodes
+        if sub_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=sub_nodes, node_color='#42c5f5', node_size=400, alpha=0.8)  # Light blue
+        
+        # Draw resource group nodes
+        if rg_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=rg_nodes, node_color='#42f59e', node_size=400, alpha=0.8)  # Green
+        
+        # Draw resource type nodes
+        if resource_type_nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=resource_type_nodes, node_color='#f5d442', node_size=400, alpha=0.8)  # Yellow
         
         # Draw edges
         nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=10, width=0.8)
