@@ -122,30 +122,20 @@ class AzureTopologyManager:
         
         try:
             client = self._get_management_groups_client()
+
+            management_group_results = client.management_groups.list()
             
-            # Get all management groups with retry logic
-            for attempt in range(3):
-                try:
-                    for mg in client.management_groups.list():
-                        # Handle potential attribute errors by using getattr with defaults
-                        mg_dict = {
-                            'id': getattr(mg, 'id', ''),
-                            'name': getattr(mg, 'name', ''),
-                            'display_name': getattr(mg, 'display_name', ''),
-                            'tenant_id': getattr(mg, 'tenant_id', ''),
-                            'type': getattr(mg, 'type', ''),
-                        }
-                        management_groups.append(mg_dict)
-                    break
-                except Exception as e:
-                    if attempt == 2:  # Last attempt
-                        # Log error but don't raise
-                        log.error(f"Failed to fetch management groups after 3 attempts: {e}")
-                        log.warning("Continuing without management groups data")
-                        return []
-                    log.warning(f"Attempt {attempt + 1} failed, retrying: {e}")
-                    time.sleep(2 ** attempt)  # Exponential backoff
-                    
+            for mg in management_group_results:
+                # Handle potential attribute errors by using getattr with defaults
+                mg_dict = {
+                    'id': getattr(mg, 'id', ''),
+                    'name': getattr(mg, 'name', ''),
+                    'display_name': getattr(mg, 'display_name', ''),
+                    'tenant_id': getattr(mg, 'tenant_id', ''),
+                    'type': getattr(mg, 'type', ''),
+                }
+                management_groups.append(mg_dict)
+             
         except Exception as e:
             # Log error but don't raise
             log.error(f"Error fetching management groups: {e}")
@@ -324,7 +314,6 @@ def visualize(output_dir: str = "./outputs") -> Dict:
     from utils import console
     from utils.visualisations import create_azure_topology_visualizations
     
-    console.print("[yellow]Running visualization only. For best results, run 'topology collect' first.[/yellow]")
     console.print("[blue]Running Azure Topology visualization...[/blue]")
     
     viz_success = create_azure_topology_visualizations(output_dir, CSV_SCHEMAS)
