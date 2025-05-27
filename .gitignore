@@ -112,6 +112,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.venv/
+venv/
 
 # Spyder project settings
 .spyderproject
@@ -152,6 +154,8 @@ cython_debug/
 # Local History for VS Code
 .history/
 
-# Virtual Environments
-.venv/
-venv/
+# Project-specific files
+resource_groups.csv
+subscriptions.csv
+resources.csv
+management_groups.csv
