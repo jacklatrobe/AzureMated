@@ -26,44 +26,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("fabric_friend")
 
-def list_fabric_instances(args):
-    """
-    List all Microsoft Fabric instances in the specified subscription.
-    
-    Args:
-        args: Command line arguments
-    """
-    credential = initialize_credential()
-    console.print("[bold]Fetching Microsoft Fabric instances...[/bold]")
-    
-    # Create Fabric manager
-    fabric_manager = FabricManager(credential, args.subscription_id)
-    
-    # Get instances
-    instances = fabric_manager.list_instances(args.resource_group)
-    
-    # TODO: Implement display logic when API is implemented
-    console.print("[yellow]Feature not yet implemented[/yellow]")
-
-def list_powerbi_premium(args):
-    """
-    List all Power BI Premium instances in the specified subscription.
-    
-    Args:
-        args: Command line arguments
-    """
-    credential = initialize_credential()
-    console.print("[bold]Fetching Power BI Premium instances...[/bold]")
-    
-    # Create Power BI manager
-    powerbi_manager = PowerBIManager(credential, args.subscription_id)
-    
-    # Get instances
-    instances = powerbi_manager.list_premium_instances(args.resource_group)
-    
-    # TODO: Implement display logic when API is implemented
-    console.print("[yellow]Feature not yet implemented[/yellow]")
-
 def check_auth(args):
     """
     Check authentication status with Azure.

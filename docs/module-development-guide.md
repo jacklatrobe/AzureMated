@@ -214,6 +214,46 @@ class FabricManager:
         return instances
 ```
 
+### CSV Output Patterns
+
+When your module needs to write CSV output files, use the centralized CSV writer utility:
+
+```python
+from utils.csv_writer import write_csv_with_schema
+
+# Define schema for your module's CSV files
+MODULE_CSV_SCHEMAS = {
+    'instances': ['id', 'name', 'location', 'resource_group', 'status', 'created_date'],
+    'configurations': ['instance_id', 'setting_name', 'setting_value', 'last_modified'],
+    'default': ['id', 'name', 'type']
+}
+
+def collect_data(subscription_id=None, output_dir="./outputs", **kwargs):
+    """Example function that writes CSV output"""
+    # Collect your data
+    instances = _manager.list_instances()
+    configurations = _manager.get_configurations()
+    
+    # Write CSV files with schema
+    os.makedirs(output_dir, exist_ok=True)
+    write_csv_with_schema(
+        os.path.join(output_dir, "instances.csv"), 
+        instances, 
+        MODULE_CSV_SCHEMAS['instances']
+    )
+    write_csv_with_schema(
+        os.path.join(output_dir, "configurations.csv"), 
+        configurations, 
+        MODULE_CSV_SCHEMAS['configurations']
+    )
+```
+
+#### Benefits of Schema-Based CSV Writing
+- **Consistency**: Ensures consistent column order across runs
+- **Empty File Handling**: Creates files with headers even when no data is available
+- **No Circular Dependencies**: Modules define their own schemas and pass them to the utility
+- **Visualization Support**: Other utilities can accept schemas as parameters
+
 ## Troubleshooting
 
 ### Common Issues

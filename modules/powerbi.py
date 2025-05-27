@@ -24,13 +24,25 @@ When creating new modules, follow this pattern to ensure compatibility with the 
 from azure.identity import ChainedTokenCredential
 from azure.core.exceptions import AzureError
 from utils import get_msal_token
-import csv
+from utils.csv_writer import write_csv_with_schema
 import logging
 import os
 from typing import List, Dict, Optional
 import requests
 
 log = logging.getLogger("fabric_friend")
+
+# Define schemas for different Power BI CSV file types
+POWERBI_CSV_SCHEMAS = {
+    'capacities': ['id', 'display_name', 'admins', 'sku', 'state', 'region'],
+    'workspaces': ['id', 'name', 'type', 'state', 'is_read_only', 'is_on_dedicated_capacity', 'capacity_id'],
+    'workspace_users': ['workspace_id', 'workspace_name', 'group_user_access_right', 'email_address', 'display_name', 'identifier', 'principal_type', 'user_type'],
+    'dashboards': ['id', 'display_name', 'workspace_id', 'workspace_name', 'embed_url', 'is_read_only', 'web_url'],
+    'dataflows': ['object_id', 'name', 'description', 'workspace_id', 'workspace_name', 'configured_by', 'modified_by', 'modified_date_time'],
+    'datasets': ['id', 'name', 'workspace_id', 'workspace_name', 'add_rows_api_enabled', 'configured_by', 'created_date', 'is_refreshable', 'is_effective_identity_required', 'is_effective_identity_roles_required', 'is_on_prem_gateway_required'],
+    # Generic fallback for unknown file types
+    'default': ['id', 'name', 'type']
+}
 
 class PowerBIManager:
     """Manager for interacting with the Power BI Admin REST API."""
@@ -111,16 +123,16 @@ class PowerBIManager:
 # Create a Power BI manager instance
 _powerbi_manager = None
 
-def _write_csv(file_path: str, data: List[Dict]) -> None:
-    """Write a list of dictionaries to a CSV file."""
-    if not data:
-        return
-
-    fieldnames = sorted({key for item in data for key in item.keys()})
-    with open(file_path, "w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(data)
+def _get_schema_for_powerbi_file(file_path: str) -> Optional[List[str]]:
+    """Get the appropriate schema for a Power BI CSV file based on its filename."""
+    file_name = os.path.basename(file_path)
+    
+    # Find the matching schema based on filename
+    for key in POWERBI_CSV_SCHEMAS:
+        if key in file_name:
+            return POWERBI_CSV_SCHEMAS[key]
+    
+    return POWERBI_CSV_SCHEMAS['default']
 
 def run(subscription_id=None, output_dir: str = ".", **kwargs):
     """
@@ -179,12 +191,12 @@ def run(subscription_id=None, output_dir: str = ".", **kwargs):
         datasets.extend([{"workspaceId": gid, **ds} for ds in _powerbi_manager.get_datasets(gid)])
 
     os.makedirs(output_dir, exist_ok=True)
-    _write_csv(os.path.join(output_dir, "capacities.csv"), capacities)
-    _write_csv(os.path.join(output_dir, "workspaces.csv"), groups)
-    _write_csv(os.path.join(output_dir, "workspace_users.csv"), users)
-    _write_csv(os.path.join(output_dir, "dashboards.csv"), dashboards)
-    _write_csv(os.path.join(output_dir, "dataflows.csv"), dataflows)
-    _write_csv(os.path.join(output_dir, "datasets.csv"), datasets)
+    write_csv_with_schema(os.path.join(output_dir, "capacities.csv"), capacities, POWERBI_CSV_SCHEMAS['capacities'])
+    write_csv_with_schema(os.path.join(output_dir, "workspaces.csv"), groups, POWERBI_CSV_SCHEMAS['workspaces'])
+    write_csv_with_schema(os.path.join(output_dir, "workspace_users.csv"), users, POWERBI_CSV_SCHEMAS['workspace_users'])
+    write_csv_with_schema(os.path.join(output_dir, "dashboards.csv"), dashboards, POWERBI_CSV_SCHEMAS['dashboards'])
+    write_csv_with_schema(os.path.join(output_dir, "dataflows.csv"), dataflows, POWERBI_CSV_SCHEMAS['dataflows'])
+    write_csv_with_schema(os.path.join(output_dir, "datasets.csv"), datasets, POWERBI_CSV_SCHEMAS['datasets'])
 
     summary = {
         "capacities": len(capacities),
