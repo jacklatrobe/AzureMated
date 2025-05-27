@@ -161,13 +161,10 @@ def run(subscription_id=None, output_dir: str = ".", **kwargs):
     global _powerbi_manager
     
     log.info("Running Power BI Admin data collection")
-    
-    # Validate required parameters
-    if not subscription_id:
-        raise ValueError("Subscription ID is required")
-    
+
     # Initialize the credential
     credential = initialize_credential()
+    access_token = credential.get_token("https://analysis.windows.net/powerbi/api/.default").token
     
     # Create or reuse the Power BI manager
     if _powerbi_manager is None or _powerbi_manager.subscription_id != subscription_id:
