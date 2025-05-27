@@ -34,7 +34,7 @@ log = logging.getLogger("fabric_friend")
 
 # Define schemas for different CSV file types
 CSV_SCHEMAS = {
-    'subscriptions': ['subscription_id', 'display_name', 'state', 'tenant_id', 'authorization_source', 'managed_by_tenants'],
+    'subscriptions': ['subscription_id', 'display_name', 'state', 'tenant_id', 'authorization_source'],
     'management_groups': ['id', 'name', 'display_name', 'tenant_id', 'type'],
     'resource_groups': ['subscription_id', 'name', 'location', 'id', 'type', 'provisioning_state', 'tags'],
     'resources': ['subscription_id', 'resource_group', 'name', 'type', 'location', 'id', 'kind', 'sku', 'tags'],
