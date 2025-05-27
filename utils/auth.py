@@ -4,14 +4,12 @@ Authentication Utilities
 This module contains functions for authenticating with Azure and Microsoft 365.
 """
 
-import sys
 import logging
 from azure.identity import (
     ChainedTokenCredential,
     AzureCliCredential,
     AzureDeveloperCliCredential,
 )
-from azure.mgmt.resource import ResourceManagementClient
 from azure.core.exceptions import AzureError
 
 log = logging.getLogger("fabric_friend")
@@ -24,25 +22,21 @@ def initialize_credential():
     Returns:
         ChainedTokenCredential: The credential object for Azure authentication
     """
+    # Create chained credentials
+    credential = ChainedTokenCredential(
+        AzureCliCredential(),
+        AzureDeveloperCliCredential()
+    )
     try:
-        # Using chained credentials
-        credential = ChainedTokenCredential(
-            AzureCliCredential(),
-            AzureDeveloperCliCredential()
-        )
-        
-        # Test the credential to make sure it works
-        # This will throw an exception if authentication fails
-        ResourceManagementClient(credential, subscription_id="00000000-0000-0000-0000-000000000000")._client.config.retry_policy.retries = 0
-        ResourceManagementClient(credential, subscription_id="00000000-0000-0000-0000-000000000000").resource_groups.list().__next__
-        
+        # Test credential by requesting a token for Azure management
+        credential.get_token("https://management.azure.com/.default")
         log.info("✅ Successfully authenticated with Azure")
         return credential
-        
     except Exception as e:
         log.error(f"❌ Authentication failed: {str(e)}")
         log.info("Please login using 'az login' or 'azd auth login' and try again.")
-        sys.exit(1)
+        # Propagate exception for check_azure_auth to handle
+        raise
 
 def check_azure_auth():
     """

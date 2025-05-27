@@ -1,7 +1,9 @@
 """
 Azure Topology Module
 
-This module contains functions for mapping Azure resource topology.
+This module implements functionality for collecting Azure topology data including subscriptions,
+management groups, resource groups, and resources. It collects organization-wide metadata and
+writes the results to CSV files for analysis.
 
 Module Structure for Module Loader Compatibility:
 -------------------------------------------------
@@ -19,92 +21,260 @@ When creating new modules, follow this pattern to ensure compatibility with the 
 
 from azure.identity import ChainedTokenCredential
 from azure.core.exceptions import AzureError
+from azure.mgmt.resource import ResourceManagementClient
+from azure.mgmt.resource.subscriptions import SubscriptionClient
+from azure.mgmt.managementgroups import ManagementGroupsAPI
+import csv
 import logging
+import os
+from typing import List, Dict, Optional
+import time
 
 log = logging.getLogger("fabric_friend")
 
-class TopologyManager:
-    """
-    Class for managing Azure resource topology.
-    """
+class AzureTopologyManager:
+    """Manager for collecting Azure topology data including subscriptions, management groups, and resources."""
     
     def __init__(self, credential: ChainedTokenCredential, subscription_id: str):
         """
-        Initialize the TopologyManager.
+        Initialize the AzureTopologyManager.
         
         Args:
-            credential: The Azure credential
+            credential: The Azure credential using chained authentication
             subscription_id: The Azure subscription ID
         """
         self.credential = credential
         self.subscription_id = subscription_id
-    
-    def get_resource_topology(self, resource_group=None, resource_type=None):
+        self._subscription_client: Optional[SubscriptionClient] = None
+        self._resource_client: Optional[ResourceManagementClient] = None
+        self._management_groups_client: Optional[ManagementGroupsAPI] = None
+
+    def _get_subscription_client(self) -> SubscriptionClient:
+        """Get or create the subscription client with retry logic."""
+        if self._subscription_client is None:
+            try:
+                self._subscription_client = SubscriptionClient(self.credential)
+            except Exception as e:
+                log.error(f"Failed to create subscription client: {e}")
+                raise AzureError(f"Failed to initialize subscription client: {e}")
+        return self._subscription_client
+
+    def _get_resource_client(self, subscription_id: str) -> ResourceManagementClient:
+        """Get or create the resource management client for a specific subscription."""
+        try:
+            return ResourceManagementClient(self.credential, subscription_id)
+        except Exception as e:
+            log.error(f"Failed to create resource client for subscription {subscription_id}: {e}")
+            raise AzureError(f"Failed to initialize resource client: {e}")
+
+    def _get_management_groups_client(self) -> ManagementGroupsAPI:
+        """Get or create the management groups client."""
+        if self._management_groups_client is None:
+            try:
+                self._management_groups_client = ManagementGroupsAPI(self.credential)
+            except Exception as e:
+                log.error(f"Failed to create management groups client: {e}")
+                raise AzureError(f"Failed to initialize management groups client: {e}")
+        return self._management_groups_client
+
+    def get_subscriptions(self) -> List[Dict]:
         """
-        Get the topology of Azure resources.
+        Get all Azure subscriptions accessible to the authenticated user.
+        
+        Returns:
+            List of dictionaries containing subscription information
+        """
+        log.info("Fetching all accessible subscriptions")
+        subscriptions = []
+        
+        try:
+            client = self._get_subscription_client()
+            
+            # Get all subscriptions with retry logic
+            for attempt in range(3):
+                try:
+                    for subscription in client.subscriptions.list():
+                        sub_dict = {
+                            'subscription_id': subscription.subscription_id,
+                            'display_name': subscription.display_name,
+                            'state': subscription.state,
+                            'tenant_id': getattr(subscription, 'tenant_id', ''),
+                            'authorization_source': getattr(subscription, 'authorization_source', ''),
+                            'managed_by_tenants': str(getattr(subscription, 'managed_by_tenants', [])),
+                        }
+                        subscriptions.append(sub_dict)
+                    break
+                except Exception as e:
+                    if attempt == 2:  # Last attempt
+                        log.error(f"Failed to fetch subscriptions after 3 attempts: {e}")
+                        raise AzureError(f"Failed to fetch subscriptions: {e}")
+                    log.warning(f"Attempt {attempt + 1} failed, retrying: {e}")
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    
+        except Exception as e:
+            log.error(f"Error fetching subscriptions: {e}")
+            raise
+            
+        log.info(f"Found {len(subscriptions)} subscriptions")
+        return subscriptions
+
+    def get_management_groups(self) -> List[Dict]:
+        """
+        Get all Azure management groups accessible to the authenticated user.
+        
+        Returns:
+            List of dictionaries containing management group information
+        """
+        log.info("Fetching management groups")
+        management_groups = []
+        
+        try:
+            client = self._get_management_groups_client()
+            
+            # Get all management groups with retry logic
+            for attempt in range(3):
+                try:
+                    for mg in client.management_groups.list():
+                        mg_dict = {
+                            'id': mg.id,
+                            'name': mg.name,
+                            'display_name': mg.display_name,
+                            'tenant_id': getattr(mg, 'tenant_id', ''),
+                            'type': mg.type,
+                        }
+                        management_groups.append(mg_dict)
+                    break
+                except Exception as e:
+                    if attempt == 2:  # Last attempt
+                        log.error(f"Failed to fetch management groups after 3 attempts: {e}")
+                        raise AzureError(f"Failed to fetch management groups: {e}")
+                    log.warning(f"Attempt {attempt + 1} failed, retrying: {e}")
+                    time.sleep(2 ** attempt)
+                    
+        except Exception as e:
+            log.error(f"Error fetching management groups: {e}")
+            raise
+            
+        log.info(f"Found {len(management_groups)} management groups")
+        return management_groups
+
+    def get_resource_groups_and_resources(self, subscription_id: str) -> tuple[List[Dict], List[Dict]]:
+        """
+        Get all resource groups and resources for a specific subscription.
         
         Args:
-            resource_group: Optional resource group to filter by
-            resource_type: Optional resource type to filter by
+            subscription_id: The subscription ID to query
             
         Returns:
-            Dictionary containing the resource topology
+            Tuple of (resource_groups, resources) as lists of dictionaries
         """
-        # TODO: Implement resource topology mapping
-        log.info("Getting Azure resource topology")
+        log.info(f"Fetching resource groups and resources for subscription {subscription_id}")
+        resource_groups = []
+        resources = []
         
-        # Placeholder for actual implementation
-        return {
-            "nodes": [],
-            "connections": []
-        }
-    
-    def get_resource_dependencies(self, resource_id):
-        """
-        Get the dependencies for a specific resource.
-        
-        Args:
-            resource_id: The ID of the resource
+        try:
+            client = self._get_resource_client(subscription_id)
             
-        Returns:
-            List of dependent resources
-        """
-        # TODO: Implement resource dependency mapping
-        log.info(f"Getting dependencies for resource {resource_id}")
-        
-        # Placeholder for actual implementation
-        return []
+            # Get resource groups with retry logic
+            for attempt in range(3):
+                try:
+                    for rg in client.resource_groups.list():
+                        rg_dict = {
+                            'subscription_id': subscription_id,
+                            'name': rg.name,
+                            'location': rg.location,
+                            'id': rg.id,
+                            'type': rg.type,
+                            'provisioning_state': getattr(rg.properties, 'provisioning_state', ''),
+                            'tags': str(rg.tags) if rg.tags else '',
+                        }
+                        resource_groups.append(rg_dict)
+                    break
+                except Exception as e:
+                    if attempt == 2:  # Last attempt
+                        log.error(f"Failed to fetch resource groups after 3 attempts: {e}")
+                        raise AzureError(f"Failed to fetch resource groups: {e}")
+                    log.warning(f"Attempt {attempt + 1} failed, retrying: {e}")
+                    time.sleep(2 ** attempt)
+            
+            # Get all resources with retry logic
+            for attempt in range(3):
+                try:
+                    for resource in client.resources.list():
+                        resource_dict = {
+                            'subscription_id': subscription_id,
+                            'resource_group': resource.id.split('/')[4] if len(resource.id.split('/')) > 4 else '',
+                            'name': resource.name,
+                            'type': resource.type,
+                            'location': resource.location,
+                            'id': resource.id,
+                            'kind': getattr(resource, 'kind', ''),
+                            'sku': str(getattr(resource, 'sku', '')) if hasattr(resource, 'sku') else '',
+                            'tags': str(resource.tags) if resource.tags else '',
+                        }
+                        resources.append(resource_dict)
+                    break
+                except Exception as e:
+                    if attempt == 2:  # Last attempt
+                        log.error(f"Failed to fetch resources after 3 attempts: {e}")
+                        raise AzureError(f"Failed to fetch resources: {e}")
+                    log.warning(f"Attempt {attempt + 1} failed, retrying: {e}")
+                    time.sleep(2 ** attempt)
+                    
+        except Exception as e:
+            log.error(f"Error fetching resources for subscription {subscription_id}: {e}")
+            raise
+            
+        log.info(f"Found {len(resource_groups)} resource groups and {len(resources)} resources for subscription {subscription_id}")
+        return resource_groups, resources
 
 # Create a topology manager instance
 _topology_manager = None
 
-def run(subscription_id=None, resource_group=None, resource_type=None, resource_id=None, **kwargs):
+def _write_csv(file_path: str, data: List[Dict]) -> None:
+    """Write a list of dictionaries to a CSV file."""
+    if not data:
+        log.warning(f"No data to write to {file_path}")
+        return
+
+    try:
+        fieldnames = sorted({key for item in data for key in item.keys()})
+        with open(file_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        log.info(f"Successfully wrote {len(data)} records to {file_path}")
+    except Exception as e:
+        log.error(f"Failed to write CSV file {file_path}: {e}")
+        raise
+
+def run(subscription_id=None, output_dir: str = ".", **kwargs):
     """
     Run the Azure Topology module functionality.
     
     This function is called by the module_loader and serves as the entry point
-    for this module.
-      Args:
-        subscription_id: The Azure subscription ID
-        resource_group: Optional resource group to filter by
-        resource_type: Optional resource type to filter by
-        resource_id: Optional specific resource ID to retrieve dependencies for
-        **kwargs: Additional arguments
-        
+    for this module. It collects Azure topology data including subscriptions,
+    management groups, resource groups, and resources, then writes them to CSV files.
+    
     Module Loader Integration:
     - This function must be defined at the module level (not inside a class)
     - It must accept subscription_id as a parameter
     - It should accept **kwargs to handle any additional parameters
     - It must return a dictionary with the results
+    
+    Args:
+        subscription_id: The Azure subscription ID (used for authentication context)
+        output_dir: Directory where CSV files will be written
+        **kwargs: Additional arguments
         
     Returns:
-        Dictionary with the results of the operation
+        Dictionary with the results of the operation including counts of collected items
     """
-    from utils import initialize_credential
+    from utils import initialize_credential, console
     
     global _topology_manager
     
-    log.info("Running Azure Topology module")
+    log.info("Running Azure Topology data collection")
     
     # Validate required parameters
     if not subscription_id:
@@ -113,14 +283,66 @@ def run(subscription_id=None, resource_group=None, resource_type=None, resource_
     # Initialize the credential
     credential = initialize_credential()
     
-    # Create or reuse the Topology manager
+    # Create or reuse the topology manager
     if _topology_manager is None or _topology_manager.subscription_id != subscription_id:
-        _topology_manager = TopologyManager(credential, subscription_id)
-    
-    # Determine the operation to perform
-    if resource_id:
-        # Get dependencies for a specific resource
-        return {"dependencies": _topology_manager.get_resource_dependencies(resource_id)}
-    else:
-        # Get resource topology
-        return {"topology": _topology_manager.get_resource_topology(resource_group, resource_type)}
+        _topology_manager = AzureTopologyManager(credential, subscription_id)
+
+    try:
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Collect subscriptions data
+        console.print("[blue]Collecting subscription information...[/blue]")
+        subscriptions = _topology_manager.get_subscriptions()
+        
+        # Collect management groups data
+        console.print("[blue]Collecting management groups...[/blue]")
+        management_groups = _topology_manager.get_management_groups()
+        
+        # Collect resource groups and resources for all accessible subscriptions
+        console.print("[blue]Collecting resource groups and resources...[/blue]")
+        all_resource_groups = []
+        all_resources = []
+        
+        for subscription in subscriptions:
+            sub_id = subscription['subscription_id']
+            console.print(f"[yellow]Processing subscription: {subscription['display_name']} ({sub_id})[/yellow]")
+            
+            try:
+                resource_groups, resources = _topology_manager.get_resource_groups_and_resources(sub_id)
+                all_resource_groups.extend(resource_groups)
+                all_resources.extend(resources)
+            except Exception as e:
+                log.warning(f"Failed to process subscription {sub_id}: {e}")
+                console.print(f"[red]Warning: Could not access subscription {sub_id}: {e}[/red]")
+                continue
+        
+        # Write CSV files
+        console.print("[blue]Writing CSV files...[/blue]")
+        _write_csv(os.path.join(output_dir, "subscriptions.csv"), subscriptions)
+        _write_csv(os.path.join(output_dir, "management_groups.csv"), management_groups)
+        _write_csv(os.path.join(output_dir, "resource_groups.csv"), all_resource_groups)
+        _write_csv(os.path.join(output_dir, "resources.csv"), all_resources)
+
+        # Create summary
+        summary = {
+            "subscriptions": len(subscriptions),
+            "management_groups": len(management_groups),
+            "resource_groups": len(all_resource_groups),
+            "resources": len(all_resources),
+        }
+
+        console.print(
+            f"[green]Azure Topology Collection Complete![/green]\n"
+            f"[green]• Subscriptions: {summary['subscriptions']}[/green]\n"
+            f"[green]• Management Groups: {summary['management_groups']}[/green]\n"
+            f"[green]• Resource Groups: {summary['resource_groups']}[/green]\n"
+            f"[green]• Resources: {summary['resources']}[/green]"
+        )
+
+        return {"summary": summary}
+        
+    except Exception as e:
+        log.error(f"Failed to collect Azure topology data: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        raise

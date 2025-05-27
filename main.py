@@ -168,10 +168,14 @@ def main():
     powerbi_scan_parser = powerbi_subparsers.add_parser("scan-data", help="Scan Power BI data")
     powerbi_scan_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
     powerbi_scan_parser.add_argument("-i", "--instance-id", help="Instance ID")
-    
-    # Azure Topology module
+      # Azure Topology module
     topology_parser = subparsers.add_parser("topology", help="Azure resource topology operations")
     topology_subparsers = topology_parser.add_subparsers(dest="command", help="Command to run")
+    
+    # Azure Topology collect command (default)
+    topology_collect_parser = topology_subparsers.add_parser("collect", help="Collect Azure topology data (subscriptions, management groups, resource groups, resources)")
+    topology_collect_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
+    topology_collect_parser.add_argument("-o", "--output-dir", default=".", help="Output directory for CSV files (default: current directory)")
     
     # Azure Topology visualize command
     topology_visualize_parser = topology_subparsers.add_parser("visualize", help="Visualize Azure resource topology")
@@ -190,7 +194,14 @@ def main():
     
     # Display header
     console.print("[bold blue]FabricFriend[/bold blue] - Microsoft Fabric and Power BI Management Tool")
-    
+    # Handle auth core util commands separately (do not load via module loader)
+    if args.module_name == "auth":
+        if args.command == "check":
+            check_auth(args)
+            sys.exit(0)
+        auth_parser.print_help()
+        sys.exit(1)
+
     # Run the specified module and command
     if hasattr(args, "module_name") and args.module_name:
         run_module(args)
