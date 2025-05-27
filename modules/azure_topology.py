@@ -15,7 +15,6 @@ from azure.core.exceptions import AzureError
 from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.resource.subscriptions import SubscriptionClient
 from azure.mgmt.managementgroups import ManagementGroupsAPI
-import csv
 import logging
 import os
 from typing import List, Dict, Optional, Mapping
@@ -170,58 +169,38 @@ class AzureTopologyManager:
         resource_groups = []
         resources = []
         
-        try:
-            client = self._get_resource_client(subscription_id)
-            
-            # Get resource groups with retry logic
-            for attempt in range(3):
-                try:
-                    for rg in client.resource_groups.list():
-                        rg_dict = {
-                            'subscription_id': subscription_id,
-                            'name': rg.name,
-                            'location': rg.location,
-                            'id': rg.id,
-                            'type': getattr(rg, 'type', 'Microsoft.Resources/resourceGroups'),
-                            'provisioning_state': getattr(rg.properties, 'provisioning_state', ''),
-                            'tags': str(rg.tags) if rg.tags else '',
-                        }
-                        resource_groups.append(rg_dict)
-                        break
-                except Exception as e:
-                    if attempt == 2:  # Last attempt
-                        log.error(f"Failed to fetch resource groups after 3 attempts: {e}")
-                        raise AzureError(f"Failed to fetch resource groups: {e}")
-                    log.warning(f"Attempt {attempt + 1} failed, retrying: {e}")
-                    time.sleep(2 ** attempt)
-            
-            # Get all resources with retry logic
-            for attempt in range(3):
-                try:
-                    for resource in client.resources.list():                        
-                        resource_dict = {
-                            'subscription_id': subscription_id,
-                            'resource_group': resource.id.split('/')[4] if resource.id and len(resource.id.split('/')) > 4 else '',
-                            'name': resource.name,
-                            'type': resource.type,
-                            'location': resource.location,
-                            'id': resource.id,
-                            'kind': getattr(resource, 'kind', ''),
-                            'sku': str(getattr(resource, 'sku', '')) if hasattr(resource, 'sku') else '',
-                            'tags': str(resource.tags) if resource.tags else '',
-                        }
-                        resources.append(resource_dict)
-                        break
-                except Exception as e:
-                    if attempt == 2:  # Last attempt
-                        log.error(f"Failed to fetch resources after 3 attempts: {e}")
-                        raise AzureError(f"Failed to fetch resources: {e}")
-                    log.warning(f"Attempt {attempt + 1} failed, retrying: {e}")
-                    time.sleep(2 ** attempt)
-                    
-        except Exception as e:
-            log.error(f"Error fetching resources for subscription {subscription_id}: {e}")
-            raise
+        client = self._get_resource_client(subscription_id)
+        
+        resource_group_results = client.resource_groups.list()
+
+        for rg in resource_group_results:
+            rg_dict = {
+                'subscription_id': subscription_id,
+                'name': rg.name,
+                'location': rg.location,
+                'id': rg.id,
+                'type': getattr(rg, 'type', 'Microsoft.Resources/resourceGroups'),
+                'provisioning_state': getattr(rg.properties, 'provisioning_state', ''),
+                'tags': str(rg.tags) if rg.tags else '',
+            }
+            resource_groups.append(rg_dict)
+
+        resource_results = client.resources.list()
+
+        for resource in resource_results:                        
+            resource_dict = {
+                'subscription_id': subscription_id,
+                'resource_group': resource.id.split('/')[4] if resource.id and len(resource.id.split('/')) > 4 else '',
+                'name': resource.name,
+                'type': resource.type,
+                'location': resource.location,
+                'id': resource.id,
+                'kind': getattr(resource, 'kind', ''),
+                'sku': str(getattr(resource, 'sku', '')) if hasattr(resource, 'sku') else '',
+                'tags': str(resource.tags) if resource.tags else '',
+            }
+            resources.append(resource_dict)
+
             
         log.info(f"Found {len(resource_groups)} resource groups and {len(resources)} resources for subscription {subscription_id}")
         return resource_groups, resources

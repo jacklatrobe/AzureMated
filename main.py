@@ -140,13 +140,12 @@ def main():
     topology_collect_parser = topology_subparsers.add_parser("collect", help="Collect Azure topology data (subscriptions, management groups, resource groups, resources)")
     topology_collect_parser.add_argument("-s", "--subscription-id", required=False, help="Azure Subscription ID (optional - will collect data from all accessible subscriptions if not specified)")
     topology_collect_parser.add_argument("-o", "--output-dir", default="./outputs", help="Output directory for CSV files (default: ./outputs)")
+    topology_collect_parser.add_argument("-t", "--resource-type", help="A filter for specific resource types (optional - will collect all resource types if not specified)")
+
     
     # Azure Topology visualize command
-    topology_visualize_parser = topology_subparsers.add_parser("visualize", help="Visualize Azure resource topology")
-    topology_visualize_parser.add_argument("-s", "--subscription-id", required=False, help="Azure Subscription ID (optional - will visualize all accessible subscriptions if not specified)")
-    topology_visualize_parser.add_argument("-o", "--output-dir", default="./outputs", help="Output directory for visualization files (default: ./outputs)")
-    topology_visualize_parser.add_argument("-t", "--resource-type", help="Resource type filter")
-    
+    topology_visualize_parser = topology_subparsers.add_parser("visualize", help="Visualize Azure resource topology")    
+    topology_visualize_parser.add_argument("-o", "--output-dir", default="./outputs", help="Output directory for visualization files (default: ./outputs)")    
     # Authentication module
     auth_parser = subparsers.add_parser("auth", help="Authentication operations")
     auth_subparsers = auth_parser.add_subparsers(dest="command", help="Command to run")

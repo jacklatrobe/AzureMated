@@ -159,3 +159,5 @@ resource_groups.csv
 subscriptions.csv
 resources.csv
 management_groups.csv
+outputs/
+outputs/*
