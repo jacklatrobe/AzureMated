@@ -84,6 +84,10 @@ def run_module(args):
     """
     Run a module using the module loader.
     
+    Each module has a standard 'run' function that serves as the entry point.
+    If a command is specified, it will be passed to the module's run function
+    or directly executed if the module has a specific function for that command.
+    
     Args:
         args: Command line arguments
     """
@@ -94,8 +98,7 @@ def run_module(args):
         module_args.pop("module_name", None)
         module_args.pop("command", None)
         module_args.pop("func", None)
-        
-        # Map CLI module names to actual module names if needed
+          # Map CLI module names to actual module names if needed
         module_name_map = {
             "topology": "azure_topology"
         }
@@ -103,11 +106,19 @@ def run_module(args):
         # Use the mapped module name if available, otherwise use the original
         actual_module_name = module_name_map.get(args.module_name, args.module_name)
         
+        # Determine the command to use
+        command = None
+        if hasattr(args, "command") and args.command:
+            # User provided a specific command, use it
+            command = args.command
+        
         # Load and run the module with the specified command
+        # If command is None, module_loader will use the default 'run' function
+        # The 'run' function should handle routing to the correct operation based on its command parameter
         result = load_and_run(
             f"modules.{actual_module_name}", 
             module_args, 
-            args.command if hasattr(args, "command") and args.command else None
+            command
         )
         
         # Display the result
@@ -128,6 +139,10 @@ def run_module(args):
             log.exception(f"Error running module {args.module_name}")
         sys.exit(1)
 
+# Global parser objects to be accessible across functions
+parser = None
+module_subparsers = {}
+
 def main():
     """
     Main entry point for the application.
@@ -135,6 +150,8 @@ def main():
     Supports Docker-like CLI structure:
     fabricfriend [module] [command] [arguments]
     """
+    global parser, module_subparsers
+    
     parser = argparse.ArgumentParser(
         description="FabricFriend - Microsoft Fabric and Power BI Management Tool"
     )
@@ -171,16 +188,20 @@ def main():
     powerbi_scan_parser.add_argument("-i", "--instance-id", help="Instance ID")    # Azure Topology module
     topology_parser = subparsers.add_parser("topology", help="Azure resource topology operations")
     topology_subparsers = topology_parser.add_subparsers(dest="command", help="Command to run")
+    module_subparsers["topology"] = topology_subparsers
     
-    # Azure Topology collect command (default)
+    # Azure Topology collect command
     topology_collect_parser = topology_subparsers.add_parser("collect", help="Collect Azure topology data (subscriptions, management groups, resource groups, resources)")
     topology_collect_parser.add_argument("-s", "--subscription-id", required=False, help="Azure Subscription ID (optional - will collect data from all accessible subscriptions if not specified)")
-    topology_collect_parser.add_argument("-o", "--output-dir", default=".", help="Output directory for CSV files (default: current directory)")
+    topology_collect_parser.add_argument("-o", "--output-dir", default="./outputs", help="Output directory for CSV files (default: ./outputs)")
     
-    # Azure Topology visualize command
+    # Azure Topology visualize command (default)
     topology_visualize_parser = topology_subparsers.add_parser("visualize", help="Visualize Azure resource topology")
     topology_visualize_parser.add_argument("-s", "--subscription-id", required=False, help="Azure Subscription ID (optional - will visualize all accessible subscriptions if not specified)")
     topology_visualize_parser.add_argument("-t", "--resource-type", help="Resource type filter")
+    
+    # Set visualize as the default command for topology
+    topology_subparsers.default = "visualize"
     
     # Authentication module
     auth_parser = subparsers.add_parser("auth", help="Authentication operations")

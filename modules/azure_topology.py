@@ -5,16 +5,7 @@ This module implements functionality for collecting Azure topology data includin
 management groups, resource groups, and resources. It collects organization-wide metadata and
 writes the results to CSV files for analysis.
 
-Module Structure for Module Loader Compatibility:
--------------------------------------------------
-1. Each module must define a 'run' function at the module level that serves as the entry point
-2. The 'run' function must accept these standard parameters:
-   - subscription_id: The Azure subscription ID (required)
-   - Any additional parameters needed for the specific module
-   - **kwargs: To capture any extra parameters passed by the module_loader
-3. The 'run' function should return a dictionary with results
-4. The module typically defines a manager class to encapsulate module-specific functionality
-5. The module should maintain a singleton instance of the manager for efficiency
+Module Structure for Module Loader Compatibility is defined in: /docs/module_deve
 
 When creating new modules, follow this pattern to ensure compatibility with the module_loader.
 """
@@ -29,6 +20,12 @@ import logging
 import os
 from typing import List, Dict, Optional, Mapping
 import time
+import matplotlib.pyplot as plt
+import matplotlib
+import pandas as pd
+import networkx as nx
+from matplotlib.colors import LinearSegmentedColormap
+from pathlib import Path
 
 log = logging.getLogger("fabric_friend")
 
@@ -279,13 +276,16 @@ def _write_csv(file_path: str, data: List[Dict]) -> None:
         log.error(f"Failed to write CSV file {file_path}: {e}")
         raise
 
-def run(subscription_id=None, output_dir: str = ".", command=None, **kwargs):
+def run(subscription_id=None, output_dir: str = "./outputs", command=None, resource_type=None, **kwargs):
     """
     Run the Azure Topology module functionality.
     
     This function is called by the module_loader and serves as the entry point
     for this module. It collects Azure topology data including subscriptions,
     management groups, resource groups, and resources, then writes them to CSV files.
+    
+    For 'collect' command: Gathers data and saves to CSV
+    For 'visualize' command: Creates visualizations from the collected data
     
     Module Loader Integration:
     - This function must be defined at the module level (not inside a class)
@@ -295,8 +295,9 @@ def run(subscription_id=None, output_dir: str = ".", command=None, **kwargs):
     
     Args:
         subscription_id: Optional Azure subscription ID to filter results. If None, collects data from all accessible subscriptions.
-        output_dir: Directory where CSV files will be written
-        command: The command being executed, used when a specific command function doesn't exist
+        output_dir: Directory where CSV files will be written (default: ./outputs)
+        command: The command being executed ('collect' or 'visualize')
+        resource_type: Optional filter for resource types (used in visualization)
         **kwargs: Additional arguments
         
     Returns:
@@ -313,72 +314,470 @@ def run(subscription_id=None, output_dir: str = ".", command=None, **kwargs):
     
     # Create or reuse the topology manager
     if _topology_manager is None or (subscription_id and _topology_manager.subscription_id != subscription_id):
-        _topology_manager = AzureTopologyManager(credential, subscription_id)
-
-    try:
+        _topology_manager = AzureTopologyManager(credential, subscription_id)    try:
         # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
         
-        # Collect subscriptions data
-        console.print("[blue]Collecting subscription information...[/blue]")
-        subscriptions = _topology_manager.get_subscriptions()
-        
-        # Collect management groups data
-        console.print("[blue]Collecting management groups...[/blue]")
-        management_groups = _topology_manager.get_management_groups()
-        
-        # Collect resource groups and resources for all accessible subscriptions
-        console.print("[blue]Collecting resource groups and resources...[/blue]")
-        all_resource_groups = []
-        all_resources = []
-        
-        # Filter subscriptions if a specific subscription_id is provided
-        target_subscriptions = subscriptions
-        if subscription_id:
-            target_subscriptions = [sub for sub in subscriptions if sub['subscription_id'] == subscription_id]
-            if not target_subscriptions:
-                log.warning(f"Specified subscription {subscription_id} not found or not accessible")
-                console.print(f"[yellow]Warning: Subscription {subscription_id} not found or not accessible[/yellow]")
-        
-        for subscription in target_subscriptions:
-            sub_id = subscription['subscription_id']
-            console.print(f"[yellow]Processing subscription: {subscription['display_name']} ({sub_id})[/yellow]")
+        # Handle different commands
+        if command == 'visualize':
+            # For visualization command, create visualizations from existing data
+            console.print("[blue]Running Azure Topology visualization...[/blue]")
+            viz_success = _create_visualizations(output_dir, resource_type_filter=resource_type)
             
-            try:
-                resource_groups, resources = _topology_manager.get_resource_groups_and_resources(sub_id)
-                all_resource_groups.extend(resource_groups)
-                all_resources.extend(resources)
-            except Exception as e:
-                log.warning(f"Failed to process subscription {sub_id}: {e}")
-                console.print(f"[red]Warning: Could not access subscription {sub_id}: {e}[/red]")
-                continue
-        
-        # Write CSV files
-        console.print("[blue]Writing CSV files...[/blue]")
-        _write_csv(os.path.join(output_dir, "subscriptions.csv"), subscriptions)
-        _write_csv(os.path.join(output_dir, "management_groups.csv"), management_groups)
-        _write_csv(os.path.join(output_dir, "resource_groups.csv"), all_resource_groups)
-        _write_csv(os.path.join(output_dir, "resources.csv"), all_resources)
+            if viz_success:
+                console.print("[green]Azure Topology Visualization Complete![/green]")
+                return {"status": "success", "message": "Visualizations created successfully"}
+            else:
+                console.print("[red]Azure Topology Visualization Failed![/red]")
+                return {"status": "error", "message": "Failed to create visualizations"}
+        else:
+            # Default to 'collect' command
+            # Collect subscriptions data
+            console.print("[blue]Collecting subscription information...[/blue]")
+            subscriptions = _topology_manager.get_subscriptions()
+            
+            # Collect management groups data
+            console.print("[blue]Collecting management groups...[/blue]")
+            management_groups = _topology_manager.get_management_groups()
+            
+            # Collect resource groups and resources for all accessible subscriptions
+            console.print("[blue]Collecting resource groups and resources...[/blue]")
+            all_resource_groups = []
+            all_resources = []
+            
+            # Filter subscriptions if a specific subscription_id is provided
+            target_subscriptions = subscriptions
+            if subscription_id:
+                target_subscriptions = [sub for sub in subscriptions if sub['subscription_id'] == subscription_id]
+                if not target_subscriptions:
+                    log.warning(f"Specified subscription {subscription_id} not found or not accessible")
+                    console.print(f"[yellow]Warning: Subscription {subscription_id} not found or not accessible[/yellow]")
+            
+            for subscription in target_subscriptions:
+                sub_id = subscription['subscription_id']
+                console.print(f"[yellow]Processing subscription: {subscription['display_name']} ({sub_id})[/yellow]")
+                
+                try:
+                    resource_groups, resources = _topology_manager.get_resource_groups_and_resources(sub_id)
+                    all_resource_groups.extend(resource_groups)
+                    all_resources.extend(resources)
+                except Exception as e:
+                    log.warning(f"Failed to process subscription {sub_id}: {e}")
+                    console.print(f"[red]Warning: Could not access subscription {sub_id}: {e}[/red]")
+                    continue
+            
+            # Write CSV files
+            console.print("[blue]Writing CSV files...[/blue]")
+            _write_csv(os.path.join(output_dir, "subscriptions.csv"), subscriptions)
+            _write_csv(os.path.join(output_dir, "management_groups.csv"), management_groups)
+            _write_csv(os.path.join(output_dir, "resource_groups.csv"), all_resource_groups)
+            _write_csv(os.path.join(output_dir, "resources.csv"), all_resources)
 
-        # Create summary
-        summary = {
-            "subscriptions": len(subscriptions),
-            "management_groups": len(management_groups),
-            "resource_groups": len(all_resource_groups),
-            "resources": len(all_resources),
-        }
+            # Create summary
+            summary = {
+                "subscriptions": len(subscriptions),
+                "management_groups": len(management_groups),
+                "resource_groups": len(all_resource_groups),
+                "resources": len(all_resources),
+            }
 
-        console.print(
-            f"[green]Azure Topology Collection Complete![/green]\n"
-            f"[green]• Subscriptions: {summary['subscriptions']}[/green]\n"
-            f"[green]• Management Groups: {summary['management_groups']}[/green]\n"
-            f"[green]• Resource Groups: {summary['resource_groups']}[/green]\n"
-            f"[green]• Resources: {summary['resources']}[/green]"
-        )
+            console.print(
+                f"[green]Azure Topology Collection Complete![/green]\n"
+                f"[green]• Subscriptions: {summary['subscriptions']}[/green]\n"
+                f"[green]• Management Groups: {summary['management_groups']}[/green]\n"
+                f"[green]• Resource Groups: {summary['resource_groups']}[/green]\n"
+                f"[green]• Resources: {summary['resources']}[/green]"
+            )
 
-        return {"summary": summary}
+            return {"summary": summary}
         
     except Exception as e:
         log.error(f"Failed to collect Azure topology data: {e}")
         console.print(f"[red]Error: {e}[/red]")
         raise
+
+def _create_visualizations(output_dir: str, resource_type_filter: Optional[str] = None):
+    """
+    Create visualizations from collected Azure topology data.
+    
+    Args:
+        output_dir: Directory where the CSV files are located and where visualizations will be saved
+        resource_type_filter: Optional filter to include only specific resource types
+    """
+    from utils import console
+    
+    console.print("[blue]Creating visualizations from topology data...[/blue]")
+    
+    # Create the output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    try:
+        # Load data from CSV files
+        subscriptions_file = os.path.join(output_dir, "subscriptions.csv")
+        mgmt_groups_file = os.path.join(output_dir, "management_groups.csv")
+        resource_groups_file = os.path.join(output_dir, "resource_groups.csv")
+        resources_file = os.path.join(output_dir, "resources.csv")
+        
+        # Check if files exist
+        if not os.path.exists(subscriptions_file):
+            console.print("[red]Error: Subscriptions data file not found. Run 'collect' command first.[/red]")
+            return False
+        
+        # Load data using pandas
+        console.print("[yellow]Loading data from CSV files...[/yellow]")
+        subscriptions_df = pd.read_csv(subscriptions_file)
+        
+        # Management groups might be empty if user doesn't have permissions
+        try:
+            if os.path.exists(mgmt_groups_file) and os.path.getsize(mgmt_groups_file) > 0:
+                mgmt_groups_df = pd.read_csv(mgmt_groups_file)
+            else:
+                mgmt_groups_df = pd.DataFrame(columns=CSV_SCHEMAS['management_groups'])
+                console.print("[yellow]Warning: No management groups data available.[/yellow]")
+        except Exception as e:
+            mgmt_groups_df = pd.DataFrame(columns=CSV_SCHEMAS['management_groups'])
+            console.print(f"[yellow]Warning: Failed to load management groups data: {e}[/yellow]")
+        
+        resource_groups_df = pd.read_csv(resource_groups_file)
+        resources_df = pd.read_csv(resources_file)
+        
+        # Apply resource type filter if specified
+        if resource_type_filter:
+            resources_df = resources_df[resources_df['type'].str.contains(resource_type_filter, na=False)]
+            console.print(f"[yellow]Applied resource type filter: {resource_type_filter}[/yellow]")
+        
+        # Create the visualizations
+        console.print("[yellow]Creating visualizations...[/yellow]")
+        
+        # 1. Management Groups and Subscriptions
+        _create_mgmt_group_subscription_viz(mgmt_groups_df, subscriptions_df, output_dir)
+        
+        # 2. Subscriptions and Resource Groups
+        _create_subscription_resource_group_viz(subscriptions_df, resource_groups_df, output_dir)
+        
+        # 3. Resource Groups and Resources
+        _create_resource_group_resources_viz(resource_groups_df, resources_df, output_dir)
+        
+        # 4. Complete hierarchy visualization
+        _create_complete_hierarchy_viz(mgmt_groups_df, subscriptions_df, resource_groups_df, resources_df, output_dir)
+        
+        console.print("[green]Visualization creation completed successfully![/green]")
+        return True
+        
+    except Exception as e:
+        log.error(f"Error creating visualizations: {e}")
+        console.print(f"[red]Error creating visualizations: {str(e)}[/red]")
+        return False
+
+def _create_mgmt_group_subscription_viz(mgmt_groups_df, subscriptions_df, output_dir):
+    """Create a visualization of management groups and their subscriptions."""
+    from utils import console
+    
+    try:
+        # Create a directed graph
+        G = nx.DiGraph()
+        
+        # Create a custom color map for the visualization
+        colors = ['#4287f5', '#42c5f5']  # Blue shades
+        cmap = LinearSegmentedColormap.from_list('azure_blues', colors)
+        
+        # Add management groups to the graph
+        mgmt_group_nodes = []
+        if not mgmt_groups_df.empty:
+            for _, row in mgmt_groups_df.iterrows():
+                node_id = row['name']
+                G.add_node(node_id, label=row['display_name'] or row['name'], type='management_group')
+                mgmt_group_nodes.append(node_id)
+        
+        # Add subscriptions to the graph
+        sub_nodes = []
+        for _, row in subscriptions_df.iterrows():
+            node_id = row['subscription_id']
+            G.add_node(node_id, label=row['display_name'], type='subscription')
+            sub_nodes.append(node_id)
+            
+            # Connect to management groups if available
+            # Note: This is a simplification - in a real implementation, you'd query the 
+            # management group structure to know exactly which subscription belongs to which group
+            if mgmt_group_nodes:
+                # For demo purposes, connect to the first management group
+                # In a real scenario, you'd determine the actual parent-child relationship
+                G.add_edge(mgmt_group_nodes[0], node_id)
+        
+        # Create visualization
+        plt.figure(figsize=(12, 8))
+        pos = nx.spring_layout(G, seed=42)
+        
+        # Draw nodes
+        node_colors = ['#4287f5' if G.nodes[n]['type'] == 'management_group' else '#42c5f5' for n in G.nodes]
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=500, alpha=0.8)
+        
+        # Draw edges
+        nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=15, width=1.0)
+        
+        # Draw labels
+        labels = {n: G.nodes[n]['label'] for n in G.nodes}
+        nx.draw_networkx_labels(G, pos, labels=labels, font_size=10, font_color='black')
+        
+        plt.title("Azure Management Groups and Subscriptions")
+        plt.axis('off')
+        
+        # Save the visualization
+        file_path = os.path.join(output_dir, "mgmt_groups_subscriptions.png")
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        console.print(f"[green]Created management groups and subscriptions visualization: {file_path}[/green]")
+        
+    except Exception as e:
+        log.error(f"Error creating management groups and subscriptions visualization: {e}")
+        console.print(f"[red]Failed to create management groups and subscriptions visualization: {str(e)}[/red]")
+
+def _create_subscription_resource_group_viz(subscriptions_df, resource_groups_df, output_dir):
+    """Create a visualization of subscriptions and their resource groups."""
+    from utils import console
+    
+    try:
+        # Create a directed graph
+        G = nx.DiGraph()
+        
+        # Add subscriptions to the graph
+        for _, row in subscriptions_df.iterrows():
+            sub_id = row['subscription_id']
+            G.add_node(sub_id, label=row['display_name'], type='subscription')
+        
+        # Add resource groups to the graph and connect to their subscription
+        for _, row in resource_groups_df.iterrows():
+            rg_id = row['id']
+            sub_id = row['subscription_id']
+            
+            G.add_node(rg_id, label=row['name'], type='resource_group')
+            if sub_id in G:
+                G.add_edge(sub_id, rg_id)
+        
+        # Create visualization
+        plt.figure(figsize=(14, 10))
+        pos = nx.spring_layout(G, seed=42)
+        
+        # Draw nodes
+        node_colors = ['#4287f5' if G.nodes[n]['type'] == 'subscription' else '#42f59e' for n in G.nodes]
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=500, alpha=0.8)
+        
+        # Draw edges
+        nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=15, width=1.0)
+        
+        # Draw labels
+        labels = {n: G.nodes[n]['label'] for n in G.nodes}
+        nx.draw_networkx_labels(G, pos, labels=labels, font_size=10, font_color='black')
+        
+        plt.title("Azure Subscriptions and Resource Groups")
+        plt.axis('off')
+        
+        # Save the visualization
+        file_path = os.path.join(output_dir, "subscriptions_resource_groups.png")
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        console.print(f"[green]Created subscriptions and resource groups visualization: {file_path}[/green]")
+        
+    except Exception as e:
+        log.error(f"Error creating subscriptions and resource groups visualization: {e}")
+        console.print(f"[red]Failed to create subscriptions and resource groups visualization: {str(e)}[/red]")
+
+def _create_resource_group_resources_viz(resource_groups_df, resources_df, output_dir):
+    """Create a visualization of resource groups and their resources."""
+    from utils import console
+    
+    try:
+        # Create a directed graph
+        G = nx.DiGraph()
+        
+        # Add resource groups to the graph
+        for _, row in resource_groups_df.iterrows():
+            rg_id = row['id']
+            G.add_node(rg_id, label=row['name'], type='resource_group')
+        
+        # Add resources to the graph (limiting to a manageable number for visualization)
+        # Group resources by type to reduce graph complexity
+        resources_by_type = {}
+        for _, row in resources_df.iterrows():
+            rg_name = row['resource_group']
+            resource_type = row['type']
+            
+            # Find the resource group node
+            rg_node = None
+            for rg_id in G.nodes():
+                if G.nodes[rg_id]['type'] == 'resource_group' and G.nodes[rg_id]['label'] == rg_name:
+                    rg_node = rg_id
+                    break
+            
+            if rg_node:
+                # Create a composite key for resource types in this resource group
+                key = f"{rg_node}_{resource_type}"
+                
+                if key not in resources_by_type:
+                    # Create a resource type node
+                    resource_type_node = f"{resource_type}_{rg_name}"
+                    G.add_node(resource_type_node, label=resource_type.split('/')[-1], type='resource_type')
+                    G.add_edge(rg_node, resource_type_node)
+                    
+                    resources_by_type[key] = {
+                        'node': resource_type_node,
+                        'count': 1
+                    }
+                else:
+                    resources_by_type[key]['count'] += 1
+        
+        # Update labels for resource type nodes to include counts
+        for key, info in resources_by_type.items():
+            node = info['node']
+            current_label = G.nodes[node]['label']
+            G.nodes[node]['label'] = f"{current_label} ({info['count']})"
+        
+        # Create visualization
+        plt.figure(figsize=(16, 12))
+        pos = nx.spring_layout(G, seed=42)
+        
+        # Draw nodes
+        node_colors = []
+        for n in G.nodes:
+            if G.nodes[n]['type'] == 'resource_group':
+                node_colors.append('#42f59e')
+            else:
+                node_colors.append('#f5d442')
+        
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=500, alpha=0.8)
+        
+        # Draw edges
+        nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=15, width=1.0)
+        
+        # Draw labels
+        labels = {n: G.nodes[n]['label'] for n in G.nodes}
+        nx.draw_networkx_labels(G, pos, labels=labels, font_size=9, font_color='black')
+        
+        plt.title("Azure Resource Groups and Resource Types")
+        plt.axis('off')
+        
+        # Save the visualization
+        file_path = os.path.join(output_dir, "resource_groups_resources.png")
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        console.print(f"[green]Created resource groups and resources visualization: {file_path}[/green]")
+        
+    except Exception as e:
+        log.error(f"Error creating resource groups and resources visualization: {e}")
+        console.print(f"[red]Failed to create resource groups and resources visualization: {str(e)}[/red]")
+
+def _create_complete_hierarchy_viz(mgmt_groups_df, subscriptions_df, resource_groups_df, resources_df, output_dir):
+    """Create a visualization of the complete Azure hierarchy."""
+    from utils import console
+    
+    try:
+        # Create a directed graph
+        G = nx.DiGraph()
+        
+        # Add management groups to the graph
+        mgmt_group_nodes = []
+        if not mgmt_groups_df.empty:
+            for _, row in mgmt_groups_df.iterrows():
+                node_id = row['name']
+                G.add_node(node_id, label=row['display_name'] or row['name'], type='management_group')
+                mgmt_group_nodes.append(node_id)
+        
+        # Add subscriptions to the graph
+        for _, row in subscriptions_df.iterrows():
+            sub_id = row['subscription_id']
+            G.add_node(sub_id, label=row['display_name'], type='subscription')
+            
+            # Connect to management groups if available
+            if mgmt_group_nodes:
+                # Simplified connection - in a real implementation, you'd determine the actual parent
+                G.add_edge(mgmt_group_nodes[0], sub_id)
+        
+        # Add resource groups to the graph
+        for _, row in resource_groups_df.iterrows():
+            rg_id = row['id']
+            sub_id = row['subscription_id']
+            
+            G.add_node(rg_id, label=row['name'], type='resource_group')
+            if sub_id in G:
+                G.add_edge(sub_id, rg_id)
+        
+        # Add aggregated resources by type to keep the graph manageable
+        resource_types = {}
+        for _, row in resources_df.iterrows():
+            rg_name = row['resource_group']
+            resource_type = row['type']
+            
+            # Find the resource group node
+            rg_node = None
+            for rg_id in G.nodes():
+                if G.nodes[rg_id]['type'] == 'resource_group' and G.nodes[rg_id]['label'] == rg_name:
+                    rg_node = rg_id
+                    break
+            
+            if rg_node:
+                # Create a composite key for resource types in this resource group
+                key = f"{rg_node}_{resource_type}"
+                
+                if key not in resource_types:
+                    # Create a resource type node
+                    resource_type_node = f"{resource_type}_{rg_name}"
+                    G.add_node(resource_type_node, label=resource_type.split('/')[-1], type='resource_type')
+                    G.add_edge(rg_node, resource_type_node)
+                    
+                    resource_types[key] = {
+                        'node': resource_type_node,
+                        'count': 1
+                    }
+                else:
+                    resource_types[key]['count'] += 1
+        
+        # Update labels for resource type nodes to include counts
+        for key, info in resource_types.items():
+            node = info['node']
+            current_label = G.nodes[node]['label']
+            G.nodes[node]['label'] = f"{current_label} ({info['count']})"
+        
+        # Create visualization
+        plt.figure(figsize=(20, 16))
+        
+        # Use hierarchical layout
+        pos = nx.nx_agraph.graphviz_layout(G, prog='dot', args='-Grankdir=TB')
+        
+        # Draw nodes with different colors per level
+        node_colors = []
+        for n in G.nodes:
+            node_type = G.nodes[n]['type']
+            if node_type == 'management_group':
+                node_colors.append('#4287f5')  # Blue
+            elif node_type == 'subscription':
+                node_colors.append('#42c5f5')  # Light blue
+            elif node_type == 'resource_group':
+                node_colors.append('#42f59e')  # Green
+            else:
+                node_colors.append('#f5d442')  # Yellow
+        
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=400, alpha=0.8)
+        
+        # Draw edges
+        nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=10, width=0.8)
+        
+        # Draw labels
+        labels = {n: G.nodes[n]['label'] for n in G.nodes}
+        nx.draw_networkx_labels(G, pos, labels=labels, font_size=8, font_color='black')
+        
+        plt.title("Complete Azure Resource Hierarchy")
+        plt.axis('off')
+        
+        # Save the visualization
+        file_path = os.path.join(output_dir, "complete_azure_hierarchy.png")
+        plt.savefig(file_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        console.print(f"[green]Created complete Azure hierarchy visualization: {file_path}[/green]")
+        
+    except Exception as e:
+        log.error(f"Error creating complete hierarchy visualization: {e}")
+        console.print(f"[red]Failed to create complete hierarchy visualization: {str(e)}[/red]")
