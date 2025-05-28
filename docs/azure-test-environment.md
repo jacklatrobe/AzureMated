@@ -132,6 +132,7 @@ resource fabricInstance 'Microsoft.Fabric/capacities@2023-11-01' = {
 }
 ```
 
+3. You MUST set a valid Fabric capacity administrator - replace user@contoso.com
 3. Save the file.
 
 ## Deploy the Template
