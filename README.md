@@ -41,6 +41,9 @@ python main.py powerbi -s <subscription_id> [-g <resource_group>]
 
 # Run a module
 python main.py run <module_name> -s <subscription_id> [additional params]
+
+# Generate an HTML report from collected outputs
+python main.py report -o <output_dir>
 ```
 
 ## Testing
@@ -95,6 +98,7 @@ Comprehensive documentation is available in the [docs](docs/) directory:
 - Microsoft Fabric instance management
 - Power BI Premium instance management
 - Azure resource topology visualization
+- HTML report generation from collected outputs
 - Modular architecture for easy extension
 - Dynamic module loading system
 

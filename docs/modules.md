@@ -204,6 +204,13 @@ FabricFriend includes these built-in cloud service modules:
 - **CLI Commands**:
   - `python main.py topology visualize -s <subscription_id> [-t <resource_type>]`
 
+### **reports.py** - HTML Report Generation
+- **Manager Class**: `ReportsManager`
+- **Operations**:
+  - `run(output_dir='./outputs')`: Assemble existing CSV outputs into an HTML report
+- **CLI Commands**:
+  - `python main.py report -o <output_dir>`
+
 **Note**: All modules currently have placeholder implementations marked with `# TODO:` comments. The structure and interfaces are established, but the actual Azure SDK integrations need to be implemented.
 
 ## Creating New Modules
