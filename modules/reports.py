@@ -65,15 +65,18 @@ class ReportsManager:
                 self._add_section(parts, title, df)
 
         # Topology visualisations if present
-        for img in [
-            "mgmt_groups_subscriptions.png",
-            "subscriptions_resource_groups.png",
-            "resource_groups_resources.png",
-            "complete_azure_hierarchy.png",
-        ]:
+        visualization_titles = {
+            "mgmt_groups_subscriptions.png": "Management Groups and Subscriptions Hierarchy",
+            "subscriptions_resource_groups.png": "Subscriptions and Resource Groups Hierarchy",
+            "resource_groups_resources.png": "Resource Groups and Resources Hierarchy",
+            "complete_azure_hierarchy.png": "Complete Azure Hierarchy"
+        }
+        
+        for img, title in visualization_titles.items():
             path = os.path.join(self.output_dir, img)
             if os.path.exists(path):
-                parts.append(f'<img src="{img}" alt="{img}" style="max-width: 100%;">')
+                parts.append(f"<h2>{title}</h2>")
+                parts.append(f'<img src="{img}" alt="{title}" style="max-width: 100%;">')
 
         # Power BI CSV files
         powerbi_files: Dict[str, str] = {
