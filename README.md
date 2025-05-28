@@ -1,7 +1,7 @@
 # AzureMated
 Don't worry about it: It's AzureMated! CLI-based tool for Azure consulting automation.
 
-A console application for Microsoft Fabric and Power BI management using the Azure Python SDK.
+[![AzuredMated Promo Video](https://img.youtube.com/vi/xf5u4CWygkA/0.jpg)](https://www.youtube.com/watch?v=xf5u4CWygkA)
 
 ## Description
 
