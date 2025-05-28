@@ -23,7 +23,7 @@ When creating new modules, follow this pattern to ensure compatibility with the 
 
 from azure.identity import ChainedTokenCredential
 from azure.core.exceptions import AzureError
-from utils import get_msal_token
+from utils.auth import get_msal_token, get_credential_token
 from utils.csv_writer import write_csv_with_schema
 import logging
 import os
@@ -52,38 +52,69 @@ class PowerBIManager:
     def __init__(self, credential: ChainedTokenCredential, subscription_id: str):
         self.credential = credential
         self.subscription_id = subscription_id
-        self._token: Optional[str] = None
-
-    # ------------------------------------------------------------------
+        self._token: Optional[str] = None    # ------------------------------------------------------------------
     # Helper methods
     # ------------------------------------------------------------------
     def _get_access_token(self) -> str:
         """Acquire an access token for the Power BI API."""
         if self._token:
             return self._token
-        # Acquire new token via MSAL with caching
+            
         scope = "https://analysis.windows.net/powerbi/api/.default"
-        token = get_msal_token([scope])
-        self._token = token
-        return token
-
+        
+        # First try to get token directly from the credential (service principal)
+        try:
+            log.info("Attempting to get token directly from credential (service principal)")
+            token = get_credential_token(self.credential, [scope])
+            self._token = token
+            return token
+        except Exception as e:
+            log.info(f"Failed to get token from credential, falling back to MSAL: {str(e)}")
+            
+        # Fall back to MSAL authentication
+        try:
+            log.info("Attempting to get token via MSAL")
+            token = get_msal_token([scope])
+            self._token = token
+            return token
+        except Exception as e:
+            raise Exception(f"Failed to acquire token for Power BI API: {str(e)}")
+    
     def _api_get(self, path: str, params: Optional[Dict[str, str]] = None) -> List[Dict]:
         """Call a Power BI Admin GET endpoint and return the aggregated results."""
         url = f"{self.ADMIN_BASE_URL}/{path.lstrip('/')}"
-        headers = {"Authorization": f"Bearer {self._get_access_token()}"}
+        
+        try:
+            headers = {"Authorization": f"Bearer {self._get_access_token()}"}
+        except Exception as e:
+            log.error(f"Failed to get access token: {str(e)}")
+            raise AzureError(
+                "Failed to authenticate with Power BI API. This API requires a service principal with the 'Power BI Service Administrator' role."
+            )
 
         results: List[Dict] = []
-        while url:
-            response = requests.get(url, headers=headers, params=params)
-            if response.status_code != 200:
-                raise AzureError(f"Power BI API request failed: {response.status_code} {response.text}")
+        try:
+            while url:
+                response = requests.get(url, headers=headers, params=params)
+                if response.status_code != 200:
+                    error_message = f"Power BI API request failed: {response.status_code}"
+                    try:
+                        error_detail = response.json()
+                        error_message += f" - {error_detail.get('error', {}).get('message', response.text)}"
+                    except:
+                        error_message += f" - {response.text}"
+                    raise AzureError(error_message)
 
-            data = response.json()
-            items = data.get("value", [])
-            results.extend(items)
+                data = response.json()
+                items = data.get("value", [])
+                results.extend(items)
 
-            url = data.get("@odata.nextLink") or data.get("nextLink")
-            params = None  # Only needed on first request
+                url = data.get("@odata.nextLink") or data.get("nextLink")
+                params = None  # Only needed on first request
+        except Exception as e:
+            if "Permission" in str(e) or "401" in str(e) or "403" in str(e):
+                log.error("Access denied. Make sure your account or service principal has Power BI Admin permissions.")
+            raise
 
         return results
 
@@ -164,28 +195,38 @@ def run(subscription_id=None, output_dir: str = ".", **kwargs):
 
     # Initialize the credential
     credential = initialize_credential()
-    access_token = credential.get_token("https://analysis.windows.net/powerbi/api/.default").token
     
-    # Create or reuse the Power BI manager
+    # We'll skip acquiring the token here and let the PowerBIManager handle it
+    # This allows us to try the credential directly first, then fall back to MSAL if needed    # Create or reuse the Power BI manager
+    # Ensure we have a valid subscription_id
+    if subscription_id is None:
+        subscription_id = "default"  # Use a default value if no subscription_id is provided
+    
     if _powerbi_manager is None or _powerbi_manager.subscription_id != subscription_id:
         _powerbi_manager = PowerBIManager(credential, subscription_id)
 
-    # Fetch organization-wide information
-    capacities = _powerbi_manager.get_capacities()
-    groups = _powerbi_manager.get_groups()
+    try:
+        # Fetch organization-wide information
+        capacities = _powerbi_manager.get_capacities()
+        groups = _powerbi_manager.get_groups()
 
-    users: List[Dict] = []
-    dashboards: List[Dict] = []
-    dataflows: List[Dict] = []
-    datasets: List[Dict] = []
+        users: List[Dict] = []
+        dashboards: List[Dict] = []
+        dataflows: List[Dict] = []
+        datasets: List[Dict] = []
 
-    for g in groups:
-        # assume 'id' always present
-        gid: str = g["id"]
-        users.extend([{"workspaceId": gid, **u} for u in _powerbi_manager.get_group_users(gid)])
-        dashboards.extend([{"workspaceId": gid, **d} for d in _powerbi_manager.get_dashboards(gid)])
-        dataflows.extend([{"workspaceId": gid, **df} for df in _powerbi_manager.get_dataflows(gid)])
-        datasets.extend([{"workspaceId": gid, **ds} for ds in _powerbi_manager.get_datasets(gid)])
+        for g in groups:
+            # assume 'id' always present
+            gid: str = g["id"]
+            users.extend([{"workspaceId": gid, **u} for u in _powerbi_manager.get_group_users(gid)])
+            dashboards.extend([{"workspaceId": gid, **d} for d in _powerbi_manager.get_dashboards(gid)])
+            dataflows.extend([{"workspaceId": gid, **df} for df in _powerbi_manager.get_dataflows(gid)])
+            datasets.extend([{"workspaceId": gid, **ds} for ds in _powerbi_manager.get_datasets(gid)])
+    except Exception as e:
+        log.error(f"Error fetching Power BI data: {str(e)}")
+        log.info("If using a service principal, ensure it has the 'Power BI Service Administrator' role.")
+        log.info("If using your user account, ensure FABRICFRIEND_CLIENT_ID and FABRICFRIEND_TENANT_ID environment variables are set.")
+        raise Exception(f"Error fetching Power BI data: {str(e)}")
 
     os.makedirs(output_dir, exist_ok=True)
     write_csv_with_schema(os.path.join(output_dir, "capacities.csv"), capacities, POWERBI_CSV_SCHEMAS['capacities'])

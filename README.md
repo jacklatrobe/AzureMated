@@ -1,8 +1,6 @@
 # AzureMated
 Don't worry about it: It's AzureMated! CLI-based tool for Azure consulting automation.
 
-A console application for Microsoft Fabric and Power BI management using the Azure Python SDK.
-
 ## Description
 
 AzureMated is a no-nonsense command-line sidekick for consultants, MSPs, and in-house cloud teams who need to discover, audit, and automate Azure workloads—fast.
@@ -19,7 +17,9 @@ cd AzureMated
 # Create and activate a virtual environment
 python -m venv venv
 # On Windows
-venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
+# Alternatively
+# venv\Scripts\activate
 # On Unix or MacOS
 # source venv/bin/activate
 

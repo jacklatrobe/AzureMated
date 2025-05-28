@@ -51,6 +51,29 @@ def check_azure_auth():
     except Exception:
         return False
 
+def get_credential_token(credential, scopes):
+    """
+    Attempt to get a token directly from the provided credential.
+    This is intended for service principals or managed identities.
+    
+    Args:
+        credential: The Azure credential object
+        scopes: List of scopes to request
+    
+    Returns:
+        str: Access token
+        
+    Raises:
+        Exception: If token acquisition fails
+    """
+    try:
+        scope = scopes[0] if isinstance(scopes, list) else scopes
+        token = credential.get_token(scope)
+        return token.token
+    except Exception as e:
+        log.error(f"Failed to acquire token from credential: {str(e)}")
+        raise Exception(f"Failed to get token for scope: {str(e)}")
+
 def get_msal_token(scopes):
     """
     Acquire and cache an access token for the specified scopes using MSAL with device flow.
