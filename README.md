@@ -5,8 +5,9 @@ A console application for Microsoft Fabric and Power BI management using the Azu
 
 ## Description
 
-AzureMated is a command-line tool that helps you manage and monitor Microsoft Fabric instances and Power BI Premium resources in your Azure environment. It provides commands for listing resources, checking authentication status, and running specialized modules.
+AzureMated is a no-nonsense command-line sidekick for consultants, MSPs, and in-house cloud teams who need to discover, audit, and automate Azure workloads—fast.
 
+Originally built for Microsoft Fabric and Power BI Premium, AzureMated now scans any Azure subscription, maps resources in seconds, and surfaces the details you care about (SKU, region, capacity, cost hints, RBAC, and more). Its plug-in architecture lets you drop in new modules—so today it lists Fabric capacities; tomorrow it might check Key Vault secrets, validate policy compliance, or kick off ARM/Bicep deployments.
 ## Installation
 
 Clone the repository and install the dependencies:
@@ -102,14 +103,6 @@ Comprehensive documentation is available in the [docs](docs/) directory:
 - HTML report generation from collected outputs
 - Modular architecture for easy extension
 - Dynamic module loading system
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Contributing
 
