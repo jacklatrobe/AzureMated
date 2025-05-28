@@ -1,6 +1,6 @@
-# FabricFriend Architecture
+# AzureMated Architecture
 
-FabricFriend is built with a modular, extensible architecture designed to support a wide range of Azure management operations.
+AzureMated is built with a modular, extensible architecture designed to support a wide range of Azure management operations.
 
 ## High-Level Architecture
 
@@ -30,7 +30,7 @@ FabricFriend is built with a modular, extensible architecture designed to suppor
 
 The entry point of the application that:
 - Parses command-line arguments using argparse with subparsers for each module
-- Implements a Docker-like CLI structure: `fabricfriend [module] [command] [arguments]`
+- Implements a Docker-like CLI structure: `azuremated [module] [command] [arguments]`
 - Routes commands to the `run_module()` function which uses the module loader
 - Provides built-in functions for authentication checking
 - Uses Rich console for formatted output
@@ -92,7 +92,7 @@ Integration with Azure services through the Azure Python SDK:
 ## Directory Structure
 
 ```
-FabricFriend/
+AzureMated/
 ├── main.py                  # Main entry point
 ├── requirements.txt         # Dependencies
 ├── docs/                    # Documentation

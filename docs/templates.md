@@ -1,6 +1,6 @@
 # Templates
 
-FabricFriend includes templates to help you create new modules and extensions.
+AzureMated includes templates to help you create new modules and extensions.
 
 ## Module Template
 

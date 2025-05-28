@@ -1,10 +1,10 @@
 # Module Development Guide
 
-This guide provides comprehensive instructions for developing new cloud service modules for FabricFriend.
+This guide provides comprehensive instructions for developing new cloud service modules for AzureMated.
 
 ## Overview
 
-FabricFriend uses a modular architecture where each Azure service is implemented as a separate module. This guide walks through creating a new module from start to finish, using Microsoft Fabric as an example.
+AzureMated uses a modular architecture where each Azure service is implemented as a separate module. This guide walks through creating a new module from start to finish, using Microsoft Fabric as an example.
 
 ## Prerequisites
 

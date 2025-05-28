@@ -1,6 +1,6 @@
-# FabricFriend Documentation
+# AzureMated Documentation
 
-This directory contains comprehensive documentation for the FabricFriend project.
+This directory contains comprehensive documentation for the AzureMated project.
 
 ## Table of Contents
 
