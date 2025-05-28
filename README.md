@@ -3,8 +3,6 @@ Don't worry about it: It's AzureMated! CLI-based tool for Azure consulting autom
 
 [![AzuredMated Promo Video](https://img.youtube.com/vi/xf5u4CWygkA/0.jpg)](https://www.youtube.com/watch?v=xf5u4CWygkA)
 
-## Description
-
 AzureMated is a no-nonsense command-line sidekick for consultants, MSPs, and in-house cloud teams who need to discover, audit, and automate Azure workloads—fast.
 
 Originally built for Microsoft Fabric and Power BI Premium, AzureMated now scans any Azure subscription, maps resources in seconds, and surfaces the details you care about (SKU, region, capacity, cost hints, RBAC, and more). Its plug-in architecture lets you drop in new modules—so today it lists Fabric capacities; tomorrow it might check Key Vault secrets, validate policy compliance, or kick off ARM/Bicep deployments.
@@ -19,7 +17,9 @@ cd AzureMated
 # Create and activate a virtual environment
 python -m venv venv
 # On Windows
-venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
+# Alternatively
+# venv\Scripts\activate
 # On Unix or MacOS
 # source venv/bin/activate
 
