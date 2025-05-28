@@ -62,7 +62,8 @@ def run_module(args):
         module_args.pop("func", None)
           # Map CLI module names to actual module names if needed
         module_name_map = {
-            "topology": "azure_topology"
+            "topology": "azure_topology",
+            "report": "reports",
         }
         
         # Use the mapped module name if available, otherwise use the original
@@ -132,7 +133,18 @@ def main():
     # Power BI scan-data command
     powerbi_scan_parser = powerbi_subparsers.add_parser("scan-data", help="Scan Power BI data")
     powerbi_scan_parser.add_argument("-s", "--subscription-id", required=True, help="Azure Subscription ID")
-    powerbi_scan_parser.add_argument("-i", "--instance-id", help="Instance ID")    # Azure Topology module
+    powerbi_scan_parser.add_argument("-i", "--instance-id", help="Instance ID")
+
+    # Report module - generates HTML report from collected CSVs
+    report_parser = subparsers.add_parser("report", help="Generate HTML report")
+    report_parser.add_argument(
+        "-o",
+        "--output-dir",
+        default="./outputs",
+        help="Directory containing module outputs (default: ./outputs)",
+    )
+
+    # Azure Topology module
     topology_parser = subparsers.add_parser("topology", help="Azure resource topology operations")
     topology_subparsers = topology_parser.add_subparsers(dest="command", help="Command to run")
     module_subparsers["topology"] = topology_subparsers
