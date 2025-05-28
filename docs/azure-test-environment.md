@@ -10,32 +10,35 @@ This guide explains how to deploy a small Azure environment for testing FabricFr
 
 ## Create the Bicep Template
 
-1. Create a new file named `test-environment.bicep`.
+To set up the test environment, we'll create a single Bicep file that deploys all the necessary resources:
+
+1. Create a new file named `test.bicep`.
 2. Copy the following code into the file:
 
 ```bicep
-targetScope = 'subscription'
+// Single Bicep file for Resource Group and Resources
+targetScope = 'resourceGroup'
 
+// Parameters
 param location string = 'eastus'
-param rgName string = 'ff-test-rg'
-param storageBlobAccountName string = 'ffblob${uniqueString(rgName)}'
-param storageAdlsAccountName string = 'ffadls${uniqueString(rgName)}'
-param sqlServerName string = 'ffsql${uniqueString(rgName)}'
+param ownerTagValue string = 'FabricFriend'  // Required by policy
+param storageBlobAccountName string = 'ffblob${uniqueString(resourceGroup().id)}'
+param storageAdlsAccountName string = 'ffadls${uniqueString(resourceGroup().id)}'
+param sqlServerName string = 'ffsql${uniqueString(resourceGroup().id)}'
 param sqlAdminUser string = 'sqladminuser'
 @secure()
 param sqlAdminPassword string
 param sqlDbName string = 'ffdb'
-param dataFactoryName string = 'ffadf${uniqueString(rgName)}'
-param fabricName string = 'fffabric${uniqueString(rgName)}'
+param dataFactoryName string = 'ffadf${uniqueString(resourceGroup().id)}'
+param fabricName string = 'fffabric${uniqueString(resourceGroup().id)}'
 
-resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
-  name: rgName
-  location: location
-}
-
+// Storage account for Blob storage
 resource storageBlob 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   name: storageBlobAccountName
-  location: rg.location
+  location: location
+  tags: {
+    Owner: ownerTagValue
+  }
   sku: {
     name: 'Standard_LRS'
   }
@@ -43,9 +46,13 @@ resource storageBlob 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   properties: {}
 }
 
+// Storage account for ADLS
 resource storageAdls 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   name: storageAdlsAccountName
-  location: rg.location
+  location: location
+  tags: {
+    Owner: ownerTagValue
+  }
   sku: {
     name: 'Standard_LRS'
   }
@@ -55,34 +62,72 @@ resource storageAdls 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   }
 }
 
+// SQL Server instance
 resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
   name: sqlServerName
-  location: rg.location
+  location: location
+  tags: {
+    Owner: ownerTagValue
+  }
   properties: {
     administratorLogin: sqlAdminUser
     administratorLoginPassword: sqlAdminPassword
   }
 }
 
+// Allow Azure services to access the SQL server
+resource sqlServerFirewallRule 'Microsoft.Sql/servers/firewallRules@2022-05-01-preview' = {
+  parent: sqlServer
+  name: 'AllowAllAzureIPs'
+  properties: {
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
+  }
+}
+
+// SQL Database
 resource sqlDb 'Microsoft.Sql/servers/databases@2022-05-01-preview' = {
   parent: sqlServer
   name: sqlDbName
+  location: location
+  tags: {
+    Owner: ownerTagValue
+  }
   sku: {
     name: 'Basic'
     tier: 'Basic'
   }
 }
 
+// Data Factory instance
 resource dataFactory 'Microsoft.DataFactory/factories@2018-06-01' = {
   name: dataFactoryName
-  location: rg.location
+  location: location
+  tags: {
+    Owner: ownerTagValue
+  }
+  identity: {
+    type: 'SystemAssigned'
+  }
 }
 
-resource fabricInstance 'Microsoft.PowerBIDedicated/capacities@2023-01-01' = {
+// Fabric instance
+resource fabricInstance 'Microsoft.Fabric/capacities@2023-11-01' = {
   name: fabricName
-  location: rg.location
+  location: location
+  tags: {
+    Owner: ownerTagValue
+  }
   sku: {
     name: 'F0'
+    tier: 'Fabric'
+  }
+  properties: {
+    administration: {
+      members: [
+        'user@contoso.com'  // Replace with your Azure AD user principal
+      ]
+    }
   }
 }
 ```
@@ -91,16 +136,24 @@ resource fabricInstance 'Microsoft.PowerBIDedicated/capacities@2023-01-01' = {
 
 ## Deploy the Template
 
-Run the following command, providing a location and resource group name. If the resource group does not exist, it will be created automatically.
+If you need to create a new resource group:
 
 ```bash
-az deployment sub create \
-  --location <azure-region> \
-  --template-file test-environment.bicep \
-  --parameters rgName=<resource-group-name> sqlAdminPassword=<password>
+az group create --name <resource-group-name> --location <azure-region> --tags Owner=FabricFriend
 ```
 
-Replace `<azure-region>` with your preferred region and `<resource-group-name>` with the desired name. Use a secure password for the SQL administrator login.
+Note: The Owner tag may be required by policy for resources and groups.
+
+Then deploy the template to the resource group:
+
+```bash
+az deployment group create \
+  --resource-group <resource-group-name> \
+  --template-file test.bicep \
+  --parameters sqlAdminPassword=<password>
+```
+
+Replace `<azure-region>` with your preferred region (e.g., 'eastus', 'westus', 'australiaeast') without any underscores, hyphens or spaces. For example, use 'australiaeast' not 'australia_east' or 'australia-east'. Replace `<resource-group-name>` with the desired name (resource group names can contain hyphens and underscores). Use a secure password for the SQL administrator login.
 
 ## Next Steps
 

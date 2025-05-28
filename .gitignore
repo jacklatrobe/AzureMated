@@ -161,3 +161,4 @@ resources.csv
 management_groups.csv
 outputs/
 outputs/*
+test.bicep
