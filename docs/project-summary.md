@@ -1,10 +1,10 @@
-# FabricFriend: Project Summary for Architects
+# AzureMated: Project Summary for Architects
 
-This document provides a comprehensive overview of the FabricFriend project structure and patterns for architects building new cloud service modules.
+This document provides a comprehensive overview of the AzureMated project structure and patterns for architects building new cloud service modules.
 
 ## Project Overview
 
-**FabricFriend** is a modular console application for managing Azure cloud services, specifically designed for Microsoft Fabric, Power BI, and other Azure resources. The architecture emphasizes:
+**AzureMated** is a modular console application for managing Azure cloud services, specifically designed for Microsoft Fabric, Power BI, and other Azure resources. The architecture emphasizes:
 
 - **Modularity**: Each cloud service is a separate, self-contained module
 - **Consistency**: All modules follow identical interface patterns

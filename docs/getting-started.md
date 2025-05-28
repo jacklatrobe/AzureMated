@@ -1,6 +1,6 @@
-# Getting Started with FabricFriend
+# Getting Started with AzureMated
 
-FabricFriend is a console application for Microsoft Fabric and Power BI management using the Azure Python SDK.
+AzureMated is a console application for Microsoft Fabric and Power BI management using the Azure Python SDK.
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ FabricFriend is a console application for Microsoft Fabric and Power BI manageme
 
 ## Basic Usage
 
-FabricFriend provides several commands through its command-line interface:
+AzureMated provides several commands through its command-line interface:
 
 ### Authentication Check
 

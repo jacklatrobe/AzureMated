@@ -1,6 +1,6 @@
 # Azure Test Data Source Environment
 
-This guide explains how to deploy a small Azure environment for testing FabricFriend. The deployment is driven by a Bicep template that creates a resource group and common data resources.
+This guide explains how to deploy a small Azure environment for testing AzureMated. The deployment is driven by a Bicep template that creates a resource group and common data resources.
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ targetScope = 'resourceGroup'
 
 // Parameters
 param location string = 'eastus'
-param ownerTagValue string = 'FabricFriend'  // Required by policy
+param ownerTagValue string = 'AzureMated'  // Required by policy
 param storageBlobAccountName string = 'ffblob${uniqueString(resourceGroup().id)}'
 param storageAdlsAccountName string = 'ffadls${uniqueString(resourceGroup().id)}'
 param sqlServerName string = 'ffsql${uniqueString(resourceGroup().id)}'
@@ -140,7 +140,7 @@ resource fabricInstance 'Microsoft.Fabric/capacities@2023-11-01' = {
 If you need to create a new resource group:
 
 ```bash
-az group create --name <resource-group-name> --location <azure-region> --tags Owner=FabricFriend
+az group create --name <resource-group-name> --location <azure-region> --tags Owner=AzureMated
 ```
 
 Note: The Owner tag may be required by policy for resources and groups.
@@ -158,7 +158,7 @@ Replace `<azure-region>` with your preferred region (e.g., 'eastus', 'westus', '
 
 ## Next Steps
 
-The created resources can be used as data sources for FabricFriend modules. Update your configuration to reference the storage accounts, SQL Database, Data Factory, and Fabric capacity as needed.
+The created resources can be used as data sources for AzureMated modules. Update your configuration to reference the storage accounts, SQL Database, Data Factory, and Fabric capacity as needed.
 
 ## See Also
 

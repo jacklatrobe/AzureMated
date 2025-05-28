@@ -1,6 +1,6 @@
 # Authentication
 
-FabricFriend uses Azure identity libraries to authenticate with Azure services.
+AzureMated uses Azure identity libraries to authenticate with Azure services.
 
 ## Authentication Flow
 

@@ -1,18 +1,19 @@
-# FabricFriend
+# AzureMated
+Don't worry about it: It's AzureMated! CLI-based tool for Azure consulting automation.
 
 A console application for Microsoft Fabric and Power BI management using the Azure Python SDK.
 
 ## Description
 
-FabricFriend is a command-line tool that helps you manage and monitor Microsoft Fabric instances and Power BI Premium resources in your Azure environment. It provides commands for listing resources, checking authentication status, and running specialized modules.
+AzureMated is a command-line tool that helps you manage and monitor Microsoft Fabric instances and Power BI Premium resources in your Azure environment. It provides commands for listing resources, checking authentication status, and running specialized modules.
 
 ## Installation
 
 Clone the repository and install the dependencies:
 
 ```bash
-git clone https://github.com/yourusername/FabricFriend.git
-cd FabricFriend
+git clone https://github.com/yourusername/AzureMated.git
+cd AzureMated
 
 # Create and activate a virtual environment
 python -m venv venv
@@ -27,7 +28,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-FabricFriend provides several commands:
+AzureMated provides several commands:
 
 ```powershell
 # Check authentication
@@ -48,7 +49,7 @@ python main.py report -o <output_dir>
 
 ## Testing
 
-FabricFriend includes a comprehensive test suite built with pytest. The tests cover:
+AzureMated includes a comprehensive test suite built with pytest. The tests cover:
 
 - Module loader functionality
 - Common utilities

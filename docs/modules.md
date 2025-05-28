@@ -1,6 +1,6 @@
 # Module System
 
-FabricFriend uses a dynamic module system to organize functionality and enable easy extension.
+AzureMated uses a dynamic module system to organize functionality and enable easy extension.
 
 ## Overview
 
@@ -173,7 +173,7 @@ python main.py powerbi scan-data -s <subscription_id>
 
 ## Available Modules
 
-FabricFriend includes these built-in cloud service modules:
+AzureMated includes these built-in cloud service modules:
 
 ### **fabric.py** - Microsoft Fabric Operations
 - **Manager Class**: `FabricManager`

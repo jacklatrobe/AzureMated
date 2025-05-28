@@ -1,6 +1,6 @@
 # Utilities
 
-FabricFriend includes a set of utility functions and classes that provide common functionality across the application.
+AzureMated includes a set of utility functions and classes that provide common functionality across the application.
 
 ## Overview
 
