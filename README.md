@@ -1,7 +1,7 @@
 # AzureMated
 Don't worry about it: It's AzureMated! CLI-based tool for Azure consulting automation.
 
-## Description
+[![AzuredMated Promo Video](https://img.youtube.com/vi/xf5u4CWygkA/0.jpg)](https://www.youtube.com/watch?v=xf5u4CWygkA)
 
 AzureMated is a no-nonsense command-line sidekick for consultants, MSPs, and in-house cloud teams who need to discover, audit, and automate Azure workloads—fast.
 
